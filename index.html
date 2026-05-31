@@ -1,0 +1,2291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FluxCRM - Enterprise Sales Management System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    colors: {
+                        slate: { 850: '#1e293b', 900: '#0f172a', 950: '#020617' },
+                        primary: { 50: '#eff6ff', 100: '#dbeafe', 200: '#bfdbfe', 300: '#93c5fd', 400: '#60a5fa', 500: '#3b82f6', 600: '#2563eb', 700: '#1d4ed8', 800: '#1e40af', 900: '#1e3a8a' },
+                        accent: { 400: '#818cf8', 500: '#6366f1', 600: '#4f46e5' },
+                        success: { 400: '#34d399', 500: '#10b981', 600: '#059669' },
+                        warning: { 400: '#fbbf24', 500: '#f59e0b', 600: '#d97706' },
+                        danger: { 400: '#f87171', 500: '#ef4444', 600: '#dc2626' }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        * { scrollbar-width: thin; scrollbar-color: #475569 #1e293b; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #1e293b; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+        .glass { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(148, 163, 184, 0.1); }
+        .glass-hover:hover { background: rgba(51, 65, 85, 0.8); border-color: rgba(99, 102, 241, 0.3); }
+        .animate-fade-in { animation: fadeIn 0.3s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .pipeline-stage { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        .pipeline-stage:hover { transform: translateY(-2px); box-shadow: 0 10px 40px -10px rgba(99, 102, 241, 0.3); }
+        .drag-over { border: 2px dashed #6366f1 !important; background: rgba(99, 102, 241, 0.1) !important; }
+        .modal-enter { animation: modalSlide 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+        @keyframes modalSlide { from { opacity: 0; transform: scale(0.95) translateY(20px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+        .toast-enter { animation: toastSlide 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+        @keyframes toastSlide { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        .pulse-ring { position: relative; }
+        .pulse-ring::after { content: ''; position: absolute; inset: -4px; border-radius: 50%; border: 2px solid #10b981; animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.2); opacity: 0; } }
+        .kanban-card { cursor: grab; transition: all 0.2s; }
+        .kanban-card:active { cursor: grabbing; transform: rotate(2deg); }
+        .sidebar-item { position: relative; overflow: hidden; }
+        .sidebar-item::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: #6366f1; transform: scaleY(0); transition: transform 0.2s; border-radius: 0 4px 4px 0; }
+        .sidebar-item.active::before { transform: scaleY(1); }
+        .sidebar-item.active { background: rgba(99, 102, 241, 0.1); color: #818cf8; }
+        .progress-bar { background: linear-gradient(90deg, #6366f1 0%, #818cf8 100%); }
+        .shimmer { background: linear-gradient(90deg, #1e293b 25%, #334155 50%, #1e293b 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; }
+        @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+        .heatmap-cell { transition: all 0.2s; }
+        .heatmap-cell:hover { transform: scale(1.1); z-index: 10; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-200 font-sans antialiased overflow-hidden">
+
+    <!-- Toast Container -->
+    <div id="toastContainer" class="fixed top-4 right-4 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+    <!-- App Container -->
+    <div class="flex h-screen w-full">
+
+        <!-- Sidebar -->
+        <aside class="w-64 bg-slate-900 border-r border-slate-800 flex flex-col flex-shrink-0">
+            <div class="p-6 border-b border-slate-800">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-600 to-accent-600 flex items-center justify-center shadow-lg shadow-primary-900/50">
+                        <i class="fas fa-bolt text-white text-lg"></i>
+                    </div>
+                    <div>
+                        <h1 class="font-bold text-xl text-white tracking-tight">FluxCRM</h1>
+                        <p class="text-xs text-slate-500">Enterprise Sales OS</p>
+                    </div>
+                </div>
+            </div>
+
+            <nav class="flex-1 overflow-y-auto p-4 space-y-1">
+                <div class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 px-3">Core Modules</div>
+                <button onclick="app.navigate('dashboard')" class="sidebar-item active w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all hover:bg-slate-800" data-page="dashboard">
+                    <i class="fas fa-chart-line w-5 text-center"></i> Dashboard
+                </button>
+                <button onclick="app.navigate('leads')" class="sidebar-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all hover:bg-slate-800" data-page="leads">
+                    <i class="fas fa-user-plus w-5 text-center"></i> Lead Management
+                    <span id="leadBadge" class="ml-auto bg-primary-600 text-white text-xs px-2 py-0.5 rounded-full">24</span>
+                </button>
+                <button onclick="app.navigate('contacts')" class="sidebar-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all hover:bg-slate-800" data-page="contacts">
+                    <i class="fas fa-address-book w-5 text-center"></i> Contacts & Accounts
+                </button>
+                <button onclick="app.navigate('pipeline')" class="sidebar-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all hover:bg-slate-800" data-page="pipeline">
+                    <i class="fas fa-stream w-5 text-center"></i> Pipeline & Opportunities
+                    <span class="ml-auto bg-accent-600 text-white text-xs px-2 py-0.5 rounded-full">$2.4M</span>
+                </button>
+                <button onclick="app.navigate('activities')" class="sidebar-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all hover:bg-slate-800" data-page="activities">
+                    <i class="fas fa-tasks w-5 text-center"></i> Activities & Tasks
+                    <span id="taskBadge" class="ml-auto bg-warning-500 text-white text-xs px-2 py-0.5 rounded-full">7</span>
+                </button>
+                <button onclick="app.navigate('quotes')" class="sidebar-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all hover:bg-slate-800" data-page="quotes">
+                    <i class="fas fa-file-invoice-dollar w-5 text-center"></i> Quotes & Proposals
+                </button>
+                <button onclick="app.navigate('orders')" class="sidebar-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all hover:bg-slate-800" data-page="orders">
+                    <i class="fas fa-shopping-cart w-5 text-center"></i> Sales Orders
+                </button>
+
+                <div class="text-xs font-semibold text-slate-500 uppercase tracking-wider mt-6 mb-2 px-3">Operations</div>
+                <button onclick="app.navigate('products')" class="sidebar-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all hover:bg-slate-800" data-page="products">
+                    <i class="fas fa-boxes w-5 text-center"></i> Products & Pricing
+                </button>
+                <button onclick="app.navigate('reports')" class="sidebar-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all hover:bg-slate-800" data-page="reports">
+                    <i class="fas fa-analytics w-5 text-center"></i> Reports & Analytics
+                </button>
+                <button onclick="app.navigate('workflows')" class="sidebar-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all hover:bg-slate-800" data-page="workflows">
+                    <i class="fas fa-cogs w-5 text-center"></i> Workflow Automation
+                </button>
+                <button onclick="app.navigate('documents')" class="sidebar-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all hover:bg-slate-800" data-page="documents">
+                    <i class="fas fa-folder-open w-5 text-center"></i> Documents
+                </button>
+                <button onclick="app.navigate('admin')" class="sidebar-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all hover:bg-slate-800" data-page="admin">
+                    <i class="fas fa-shield-alt w-5 text-center"></i> Security & Admin
+                </button>
+                <button onclick="app.navigate('integrations')" class="sidebar-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all hover:bg-slate-800" data-page="integrations">
+                    <i class="fas fa-plug w-5 text-center"></i> Integrations
+                </button>
+            </nav>
+
+            <div class="p-4 border-t border-slate-800">
+                <div class="flex items-center gap-3 p-3 rounded-lg bg-slate-800/50 border border-slate-700">
+                    <img src="https://ui-avatars.com/api/?name=Alex+Morgan&background=6366f1&color=fff" class="w-9 h-9 rounded-full ring-2 ring-slate-700">
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-medium text-white truncate">Alex Morgan</p>
+                        <p class="text-xs text-slate-400 truncate">Sales Director</p>
+                    </div>
+                    <button onclick="app.toggleUserMenu()" class="text-slate-400 hover:text-white transition-colors">
+                        <i class="fas fa-ellipsis-v"></i>
+                    </button>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex-1 flex flex-col overflow-hidden bg-slate-950">
+            <!-- Top Bar -->
+            <header class="h-16 bg-slate-900/80 backdrop-blur-md border-b border-slate-800 flex items-center justify-between px-6 flex-shrink-0 z-20">
+                <div class="flex items-center gap-4">
+                    <h2 id="pageTitle" class="text-lg font-semibold text-white">Dashboard</h2>
+                    <span id="pageSubtitle" class="text-sm text-slate-500 hidden sm:inline">Real-time sales intelligence</span>
+                </div>
+                <div class="flex items-center gap-3">
+                    <div class="relative">
+                        <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm"></i>
+                        <input type="text" placeholder="Global search..." class="pl-9 pr-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500 w-64 transition-all">
+                    </div>
+                    <button class="relative p-2 text-slate-400 hover:text-white transition-colors rounded-lg hover:bg-slate-800">
+                        <i class="fas fa-bell"></i>
+                        <span class="absolute top-1 right-1 w-2 h-2 bg-danger-500 rounded-full pulse-ring"></span>
+                    </button>
+                    <button class="p-2 text-slate-400 hover:text-white transition-colors rounded-lg hover:bg-slate-800">
+                        <i class="fas fa-plus"></i>
+                    </button>
+                </div>
+            </header>
+
+            <!-- Content Area -->
+            <div id="contentArea" class="flex-1 overflow-y-auto p-6">
+                <!-- Dynamic content injected here -->
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal Overlay -->
+    <div id="modalOverlay" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 hidden items-center justify-center p-4">
+        <div id="modalContent" class="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto modal-enter"></div>
+    </div>
+
+    <script>
+        // ==================== DATA STORE ====================
+        const store = {
+            leads: [
+                { id: 1, name: "Sarah Chen", company: "TechVentures Inc", email: "s.chen@techventures.com", phone: "+1 (555) 234-5678", source: "Website", score: 92, status: "Hot", assigned: "Alex Morgan", created: "2026-05-28", lastActivity: "2 hours ago", notes: "Interested in enterprise plan. Budget approved." },
+                { id: 2, name: "Marcus Johnson", company: "Global Dynamics", email: "m.johnson@globaldyn.com", phone: "+1 (555) 876-1234", source: "LinkedIn", score: 78, status: "Warm", assigned: "Alex Morgan", created: "2026-05-27", lastActivity: "5 hours ago", notes: "CTO referral. Evaluating 3 vendors." },
+                { id: 3, name: "Elena Rodriguez", company: "InnovateSoft", email: "e.rodriguez@innovatesoft.io", phone: "+1 (555) 456-7890", source: "Trade Show", score: 85, status: "Hot", assigned: "Jordan Lee", created: "2026-05-26", lastActivity: "1 day ago", notes: "Met at SaaS Summit 2026. Immediate need." },
+                { id: 4, name: "David Park", company: "DataFlow Systems", email: "d.park@dataflow.sys", phone: "+1 (555) 321-6547", source: "Email Campaign", score: 45, status: "Cold", assigned: "Sam Taylor", created: "2026-05-25", lastActivity: "3 days ago", notes: "Downloaded whitepaper. No response yet." },
+                { id: 5, name: "Amanda Foster", company: "CloudNine Solutions", email: "a.foster@cloudnine.io", phone: "+1 (555) 987-4321", source: "Referral", score: 88, status: "Warm", assigned: "Alex Morgan", created: "2026-05-24", lastActivity: "6 hours ago", notes: "Existing customer referral. High intent." },
+                { id: 6, name: "Robert Kim", company: "Quantum Leap", email: "r.kim@quantumleap.tech", phone: "+1 (555) 654-3210", source: "Google Ads", score: 62, status: "Warm", assigned: "Jordan Lee", created: "2026-05-23", lastActivity: "2 days ago", notes: "Clicked ad 3 times. Pricing page visited." },
+                { id: 7, name: "Lisa Thompson", company: "Meridian Corp", email: "l.thompson@meridian.co", phone: "+1 (555) 789-0123", source: "Cold Call", score: 35, status: "Cold", assigned: "Sam Taylor", created: "2026-05-22", lastActivity: "5 days ago", notes: "Gatekeeper blocked. Need alternative contact." },
+                { id: 8, name: "James Wilson", company: "Atlas Industries", email: "j.wilson@atlas.ind", phone: "+1 (555) 234-8901", source: "Website", score: 95, status: "Hot", assigned: "Alex Morgan", created: "2026-05-21", lastActivity: "30 mins ago", notes: "Demo completed. Ready to sign. Legal review pending." },
+            ],
+            contacts: [
+                { id: 1, name: "Sarah Chen", company: "TechVentures Inc", role: "VP of Engineering", email: "s.chen@techventures.com", phone: "+1 (555) 234-5678", type: "Prospect", lastContact: "2026-05-31", deals: 1, value: 125000 },
+                { id: 2, name: "Marcus Johnson", company: "Global Dynamics", role: "CTO", email: "m.johnson@globaldyn.com", phone: "+1 (555) 876-1234", type: "Prospect", lastContact: "2026-05-30", deals: 1, value: 85000 },
+                { id: 3, name: "Elena Rodriguez", company: "InnovateSoft", role: "CEO", email: "e.rodriguez@innovatesoft.io", phone: "+1 (555) 456-7890", type: "Prospect", lastContact: "2026-05-29", deals: 1, value: 200000 },
+                { id: 4, name: "Michael Brooks", company: "Stellar Enterprises", role: "Procurement Manager", email: "m.brooks@stellar.com", phone: "+1 (555) 111-2222", type: "Customer", lastContact: "2026-05-28", deals: 3, value: 450000 },
+                { id: 5, name: "Jennifer Walsh", company: "Nexus Group", role: "Director of IT", email: "j.walsh@nexus.group", phone: "+1 (555) 333-4444", type: "Customer", lastContact: "2026-05-27", deals: 2, value: 320000 },
+                { id: 6, name: "Carlos Mendez", company: "Horizon Tech", role: "Sales Manager", email: "c.mendez@horizon.tech", phone: "+1 (555) 555-6666", type: "Partner", lastContact: "2026-05-26", deals: 0, value: 0 },
+            ],
+            opportunities: [
+                { id: 1, name: "TechVentures Enterprise Deal", company: "TechVentures Inc", contact: "Sarah Chen", value: 125000, stage: "Negotiation", probability: 75, expectedClose: "2026-06-15", assigned: "Alex Morgan", lastActivity: "2 hours ago", nextAction: "Send contract draft", priority: "High" },
+                { id: 2, name: "Global Dynamics Migration", company: "Global Dynamics", contact: "Marcus Johnson", value: 85000, stage: "Proposal", probability: 50, expectedClose: "2026-06-30", assigned: "Alex Morgan", lastActivity: "5 hours ago", nextAction: "Technical demo", priority: "Medium" },
+                { id: 3, name: "InnovateSoft Platform License", company: "InnovateSoft", contact: "Elena Rodriguez", value: 200000, stage: "Discovery", probability: 30, expectedClose: "2026-07-15", assigned: "Jordan Lee", lastActivity: "1 day ago", nextAction: "Requirements workshop", priority: "High" },
+                { id: 4, name: "DataFlow Integration Project", company: "DataFlow Systems", contact: "David Park", value: 45000, stage: "Qualification", probability: 20, expectedClose: "2026-07-30", assigned: "Sam Taylor", lastActivity: "3 days ago", nextAction: "Initial call", priority: "Low" },
+                { id: 5, name: "CloudNine Expansion", company: "CloudNine Solutions", contact: "Amanda Foster", value: 175000, stage: "Negotiation", probability: 80, expectedClose: "2026-06-10", assigned: "Alex Morgan", lastActivity: "6 hours ago", nextAction: "Final pricing approval", priority: "High" },
+                { id: 6, name: "Quantum Leap SaaS Bundle", company: "Quantum Leap", contact: "Robert Kim", value: 65000, stage: "Proposal", probability: 45, expectedClose: "2026-06-25", assigned: "Jordan Lee", lastActivity: "2 days ago", nextAction: "ROI presentation", priority: "Medium" },
+                { id: 7, name: "Atlas Industries Renewal", company: "Atlas Industries", contact: "James Wilson", value: 95000, stage: "Closed Won", probability: 100, expectedClose: "2026-05-31", assigned: "Alex Morgan", lastActivity: "30 mins ago", nextAction: "Onboarding kickoff", priority: "High" },
+                { id: 8, name: "Meridian Pilot Program", company: "Meridian Corp", contact: "Lisa Thompson", value: 35000, stage: "Qualification", probability: 15, expectedClose: "2026-08-15", assigned: "Sam Taylor", lastActivity: "5 days ago", nextAction: "Stakeholder mapping", priority: "Low" },
+            ],
+            activities: [
+                { id: 1, type: "call", title: "Discovery call with TechVentures", contact: "Sarah Chen", due: "2026-05-31 14:00", status: "Completed", priority: "High", notes: "Discussed requirements, budget confirmed at $125K" },
+                { id: 2, type: "meeting", title: "Demo presentation for Global Dynamics", contact: "Marcus Johnson", due: "2026-06-02 10:00", status: "Scheduled", priority: "High", notes: "Prepare technical slides" },
+                { id: 3, type: "task", title: "Send proposal to InnovateSoft", contact: "Elena Rodriguez", due: "2026-06-01 17:00", status: "Pending", priority: "Medium", notes: "Include custom pricing" },
+                { id: 4, type: "email", title: "Follow-up email to DataFlow", contact: "David Park", due: "2026-05-31 16:00", status: "Overdue", priority: "Low", notes: "Whitepaper attachment" },
+                { id: 5, type: "call", title: "Contract negotiation call", contact: "Amanda Foster", due: "2026-06-01 11:00", status: "Scheduled", priority: "High", notes: "Legal team to join" },
+                { id: 6, type: "meeting", title: "Q2 Review with Stellar Enterprises", contact: "Michael Brooks", due: "2026-06-03 09:00", status: "Scheduled", priority: "Medium", notes: "Upsell opportunity discussion" },
+                { id: 7, type: "task", title: "Update CRM data for Quantum Leap", contact: "Robert Kim", due: "2026-05-30 18:00", status: "Overdue", priority: "Low", notes: "Missing contact details" },
+            ],
+            quotes: [
+                { id: "QT-2026-0042", customer: "TechVentures Inc", contact: "Sarah Chen", date: "2026-05-28", expiry: "2026-06-15", total: 125000, status: "Sent", items: 3, discount: 10 },
+                { id: "QT-2026-0041", customer: "Global Dynamics", contact: "Marcus Johnson", date: "2026-05-25", expiry: "2026-06-10", total: 85000, status: "Draft", items: 2, discount: 5 },
+                { id: "QT-2026-0040", customer: "CloudNine Solutions", contact: "Amanda Foster", date: "2026-05-22", expiry: "2026-06-05", total: 175000, status: "Accepted", items: 5, discount: 15 },
+                { id: "QT-2026-0039", customer: "InnovateSoft", contact: "Elena Rodriguez", date: "2026-05-20", expiry: "2026-06-01", total: 200000, status: "Draft", items: 4, discount: 0 },
+            ],
+            orders: [
+                { id: "SO-2026-0105", customer: "Atlas Industries", contact: "James Wilson", date: "2026-05-31", total: 95000, status: "Processing", items: 2, payment: "Net 30" },
+                { id: "SO-2026-0104", customer: "Stellar Enterprises", contact: "Michael Brooks", date: "2026-05-28", total: 150000, status: "Shipped", items: 4, payment: "Paid" },
+                { id: "SO-2026-0103", customer: "Nexus Group", contact: "Jennifer Walsh", date: "2026-05-25", total: 85000, status: "Delivered", items: 3, payment: "Paid" },
+                { id: "SO-2026-0102", customer: "CloudNine Solutions", contact: "Amanda Foster", date: "2026-05-20", total: 75000, status: "Invoiced", items: 2, payment: "Net 15" },
+            ],
+            products: [
+                { id: 1, name: "FluxCRM Professional", sku: "FLX-PRO-001", category: "Software License", price: 5000, unit: "user/year", stock: "Unlimited", status: "Active" },
+                { id: 2, name: "FluxCRM Enterprise", sku: "FLX-ENT-001", category: "Software License", price: 12000, unit: "user/year", stock: "Unlimited", status: "Active" },
+                { id: 3, name: "Implementation Services", sku: "FLX-IMP-001", category: "Services", price: 25000, unit: "project", stock: "Available", status: "Active" },
+                { id: 4, name: "Training Package - Basic", sku: "FLX-TRB-001", category: "Services", price: 5000, unit: "session", stock: "Available", status: "Active" },
+                { id: 5, name: "Training Package - Advanced", sku: "FLX-TRA-001", category: "Services", price: 12000, unit: "session", stock: "Available", status: "Active" },
+                { id: 6, name: "API Integration Module", sku: "FLX-API-001", category: "Add-on", price: 8000, unit: "connector", stock: "Available", status: "Active" },
+            ],
+            users: [
+                { id: 1, name: "Alex Morgan", email: "alex.morgan@fluxcrm.com", role: "Sales Director", team: "Enterprise", quota: 500000, closed: 425000, active: true },
+                { id: 2, name: "Jordan Lee", email: "jordan.lee@fluxcrm.com", role: "Account Executive", team: "Mid-Market", quota: 300000, closed: 210000, active: true },
+                { id: 3, name: "Sam Taylor", email: "sam.taylor@fluxcrm.com", role: "Sales Development", team: "Inbound", quota: 150000, closed: 95000, active: true },
+                { id: 4, name: "Casey Rivera", email: "casey.rivera@fluxcrm.com", role: "Sales Engineer", team: "Enterprise", quota: 0, closed: 0, active: true },
+            ],
+            workflows: [
+                { id: 1, name: "Lead Auto-Assignment", trigger: "New Lead Created", actions: ["Score Lead", "Assign to Rep", "Send Welcome Email"], status: "Active", runs: 1247 },
+                { id: 2, name: "Deal Stage Progression", trigger: "Stage Change", actions: ["Update Probability", "Notify Manager", "Create Task"], status: "Active", runs: 892 },
+                { id: 3, name: "Quote Follow-up", trigger: "Quote Sent", actions: ["Wait 3 Days", "Send Reminder", "Create Follow-up Task"], status: "Active", runs: 456 },
+                { id: 4, name: "Contract Renewal Alert", trigger: "30 Days Before Expiry", actions: ["Create Renewal Opp", "Notify Account Manager", "Send Health Check"], status: "Active", runs: 234 },
+                { id: 5, name: "Win/Loss Analysis", trigger: "Deal Closed", actions: ["Send Survey", "Update Dashboard", "Archive Documents"], status: "Inactive", runs: 0 },
+            ],
+            documents: [
+                { id: 1, name: "Enterprise SLA - TechVentures.pdf", type: "Contract", size: "2.4 MB", modified: "2026-05-28", owner: "Alex Morgan" },
+                { id: 2, name: "Q2 Proposal Template.pptx", type: "Template", size: "5.1 MB", modified: "2026-05-25", owner: "Marketing Team" },
+                { id: 3, name: "Product Catalog 2026.pdf", type: "Catalog", size: "8.7 MB", modified: "2026-05-20", owner: "Product Team" },
+                { id: 4, name: "Global Dynamics - NDA.pdf", type: "Legal", size: "450 KB", modified: "2026-05-22", owner: "Alex Morgan" },
+            ],
+            integrations: [
+                { name: "Salesforce", status: "Connected", type: "CRM", lastSync: "2 mins ago" },
+                { name: "QuickBooks", status: "Connected", type: "Accounting", lastSync: "15 mins ago" },
+                { name: "Mailchimp", status: "Connected", type: "Marketing", lastSync: "1 hour ago" },
+                { name: "Slack", status: "Connected", type: "Communication", lastSync: "5 mins ago" },
+                { name: "Stripe", status: "Pending", type: "Payment", lastSync: "Never" },
+                { name: "HubSpot", status: "Disconnected", type: "Marketing", lastSync: "3 days ago" },
+            ]
+        };
+
+        // ==================== APP CONTROLLER ====================
+        const app = {
+            currentPage: 'dashboard',
+            draggedItem: null,
+
+            init() {
+                this.navigate('dashboard');
+                this.startRealtimeUpdates();
+            },
+
+            navigate(page) {
+                this.currentPage = page;
+                document.querySelectorAll('.sidebar-item').forEach(el => {
+                    el.classList.remove('active');
+                    if (el.dataset.page === page) el.classList.add('active');
+                });
+
+                const titles = {
+                    dashboard: ['Dashboard', 'Real-time sales intelligence'],
+                    leads: ['Lead Management', 'Capture, score, and nurture prospects'],
+                    contacts: ['Contacts & Accounts', '360° customer relationship view'],
+                    pipeline: ['Pipeline & Opportunities', 'Visual deal tracking and forecasting'],
+                    activities: ['Activities & Tasks', 'Follow-ups, meetings, and calls'],
+                    quotes: ['Quotes & Proposals', 'Generate and track quotations'],
+                    orders: ['Sales Orders', 'Order processing and fulfillment'],
+                    products: ['Products & Pricing', 'Catalog and pricing management'],
+                    reports: ['Reports & Analytics', 'Performance insights and KPIs'],
+                    workflows: ['Workflow Automation', 'Sales process automation'],
+                    documents: ['Document Management', 'Contracts, proposals, and files'],
+                    admin: ['Security & Administration', 'Roles, permissions, and compliance'],
+                    integrations: ['Integrations', 'Connect your business tools']
+                };
+
+                document.getElementById('pageTitle').textContent = titles[page][0];
+                document.getElementById('pageSubtitle').textContent = titles[page][1];
+
+                this.renderPage(page);
+            },
+
+            renderPage(page) {
+                const container = document.getElementById('contentArea');
+                container.innerHTML = '';
+
+                switch(page) {
+                    case 'dashboard': this.renderDashboard(container); break;
+                    case 'leads': this.renderLeads(container); break;
+                    case 'contacts': this.renderContacts(container); break;
+                    case 'pipeline': this.renderPipeline(container); break;
+                    case 'activities': this.renderActivities(container); break;
+                    case 'quotes': this.renderQuotes(container); break;
+                    case 'orders': this.renderOrders(container); break;
+                    case 'products': this.renderProducts(container); break;
+                    case 'reports': this.renderReports(container); break;
+                    case 'workflows': this.renderWorkflows(container); break;
+                    case 'documents': this.renderDocuments(container); break;
+                    case 'admin': this.renderAdmin(container); break;
+                    case 'integrations': this.renderIntegrations(container); break;
+                }
+            },
+
+            // ==================== DASHBOARD ====================
+            renderDashboard(container) {
+                const totalPipeline = store.opportunities.reduce((sum, o) => sum + o.value, 0);
+                const weightedPipeline = store.opportunities.reduce((sum, o) => sum + (o.value * o.probability / 100), 0);
+                const closedWon = store.opportunities.filter(o => o.stage === 'Closed Won').reduce((sum, o) => sum + o.value, 0);
+                const openDeals = store.opportunities.filter(o => o.stage !== 'Closed Won' && o.stage !== 'Closed Lost').length;
+
+                container.innerHTML = `
+                    <div class="animate-fade-in space-y-6">
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                            <div class="glass rounded-xl p-5 border border-slate-800">
+                                <div class="flex justify-between items-start mb-3">
+                                    <div>
+                                        <p class="text-slate-400 text-sm font-medium">Total Pipeline</p>
+                                        <p class="text-2xl font-bold text-white mt-1">$${(totalPipeline/1000).toFixed(1)}K</p>
+                                    </div>
+                                    <div class="w-10 h-10 rounded-lg bg-primary-500/20 flex items-center justify-center">
+                                        <i class="fas fa-chart-pie text-primary-400"></i>
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-2 text-sm">
+                                    <span class="text-success-400 font-medium"><i class="fas fa-arrow-up mr-1"></i>12.5%</span>
+                                    <span class="text-slate-500">vs last month</span>
+                                </div>
+                            </div>
+                            <div class="glass rounded-xl p-5 border border-slate-800">
+                                <div class="flex justify-between items-start mb-3">
+                                    <div>
+                                        <p class="text-slate-400 text-sm font-medium">Weighted Forecast</p>
+                                        <p class="text-2xl font-bold text-white mt-1">$${(weightedPipeline/1000).toFixed(1)}K</p>
+                                    </div>
+                                    <div class="w-10 h-10 rounded-lg bg-accent-500/20 flex items-center justify-center">
+                                        <i class="fas fa-bullseye text-accent-400"></i>
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-2 text-sm">
+                                    <span class="text-success-400 font-medium"><i class="fas fa-arrow-up mr-1"></i>8.3%</span>
+                                    <span class="text-slate-500">vs last month</span>
+                                </div>
+                            </div>
+                            <div class="glass rounded-xl p-5 border border-slate-800">
+                                <div class="flex justify-between items-start mb-3">
+                                    <div>
+                                        <p class="text-slate-400 text-sm font-medium">Closed Won (YTD)</p>
+                                        <p class="text-2xl font-bold text-white mt-1">$${(closedWon/1000).toFixed(1)}K</p>
+                                    </div>
+                                    <div class="w-10 h-10 rounded-lg bg-success-500/20 flex items-center justify-center">
+                                        <i class="fas fa-check-circle text-success-400"></i>
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-2 text-sm">
+                                    <span class="text-success-400 font-medium"><i class="fas fa-arrow-up mr-1"></i>23.1%</span>
+                                    <span class="text-slate-500">vs last year</span>
+                                </div>
+                            </div>
+                            <div class="glass rounded-xl p-5 border border-slate-800">
+                                <div class="flex justify-between items-start mb-3">
+                                    <div>
+                                        <p class="text-slate-400 text-sm font-medium">Open Deals</p>
+                                        <p class="text-2xl font-bold text-white mt-1">${openDeals}</p>
+                                    </div>
+                                    <div class="w-10 h-10 rounded-lg bg-warning-500/20 flex items-center justify-center">
+                                        <i class="fas fa-handshake text-warning-400"></i>
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-2 text-sm">
+                                    <span class="text-warning-400 font-medium"><i class="fas fa-clock mr-1"></i>3</span>
+                                    <span class="text-slate-500">stalled >30 days</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                            <div class="lg:col-span-2 glass rounded-xl p-6 border border-slate-800">
+                                <div class="flex justify-between items-center mb-4">
+                                    <h3 class="font-semibold text-white">Revenue Trend</h3>
+                                    <select class="bg-slate-800 border border-slate-700 rounded-lg text-sm px-3 py-1 text-slate-300">
+                                        <option>Last 6 Months</option>
+                                        <option>This Year</option>
+                                        <option>Last Year</option>
+                                    </select>
+                                </div>
+                                <div class="h-64">
+                                    <canvas id="revenueChart"></canvas>
+                                </div>
+                            </div>
+                            <div class="glass rounded-xl p-6 border border-slate-800">
+                                <h3 class="font-semibold text-white mb-4">Win Rate by Stage</h3>
+                                <div class="h-64">
+                                    <canvas id="funnelChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            <div class="glass rounded-xl p-6 border border-slate-800">
+                                <div class="flex justify-between items-center mb-4">
+                                    <h3 class="font-semibold text-white">Pipeline by Stage</h3>
+                                    <button onclick="app.navigate('pipeline')" class="text-primary-400 text-sm hover:text-primary-300">View All</button>
+                                </div>
+                                <div class="space-y-3">
+                                    ${['Qualification', 'Discovery', 'Proposal', 'Negotiation', 'Closed Won'].map(stage => {
+                                        const stageDeals = store.opportunities.filter(o => o.stage === stage);
+                                        const stageValue = stageDeals.reduce((sum, o) => sum + o.value, 0);
+                                        const totalValue = store.opportunities.reduce((sum, o) => sum + o.value, 0);
+                                        const pct = totalValue > 0 ? (stageValue / totalValue * 100) : 0;
+                                        const colors = { 'Qualification': 'bg-slate-500', 'Discovery': 'bg-primary-500', 'Proposal': 'bg-accent-500', 'Negotiation': 'bg-warning-500', 'Closed Won': 'bg-success-500' };
+                                        return `
+                                            <div>
+                                                <div class="flex justify-between text-sm mb-1">
+                                                    <span class="text-slate-300">${stage}</span>
+                                                    <span class="text-slate-400">$${(stageValue/1000).toFixed(0)}K (${stageDeals.length} deals)</span>
+                                                </div>
+                                                <div class="h-2 bg-slate-800 rounded-full overflow-hidden">
+                                                    <div class="h-full ${colors[stage]} rounded-full transition-all duration-500" style="width: ${pct}%"></div>
+                                                </div>
+                                            </div>
+                                        `;
+                                    }).join('')}
+                                </div>
+                            </div>
+                            <div class="glass rounded-xl p-6 border border-slate-800">
+                                <div class="flex justify-between items-center mb-4">
+                                    <h3 class="font-semibold text-white">Today's Activities</h3>
+                                    <button onclick="app.navigate('activities')" class="text-primary-400 text-sm hover:text-primary-300">View All</button>
+                                </div>
+                                <div class="space-y-3">
+                                    ${store.activities.slice(0, 5).map(act => {
+                                        const icons = { call: 'phone', meeting: 'video', task: 'check-square', email: 'envelope' };
+                                        const colors = { call: 'bg-primary-500/20 text-primary-400', meeting: 'bg-accent-500/20 text-accent-400', task: 'bg-success-500/20 text-success-400', email: 'bg-warning-500/20 text-warning-400' };
+                                        const statusColors = { Completed: 'text-success-400', Scheduled: 'text-primary-400', Pending: 'text-warning-400', Overdue: 'text-danger-400' };
+                                        return `
+                                            <div class="flex items-center gap-3 p-3 rounded-lg bg-slate-800/50 hover:bg-slate-800 transition-colors">
+                                                <div class="w-9 h-9 rounded-lg ${colors[act.type]} flex items-center justify-center flex-shrink-0">
+                                                    <i class="fas fa-${icons[act.type]} text-sm"></i>
+                                                </div>
+                                                <div class="flex-1 min-w-0">
+                                                    <p class="text-sm font-medium text-white truncate">${act.title}</p>
+                                                    <p class="text-xs text-slate-500">${act.contact} • ${act.due.split(' ')[1]}</p>
+                                                </div>
+                                                <span class="text-xs font-medium ${statusColors[act.status]}">${act.status}</span>
+                                            </div>
+                                        `;
+                                    }).join('')}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="glass rounded-xl p-6 border border-slate-800">
+                            <h3 class="font-semibold text-white mb-4">Team Performance</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                ${store.users.map(user => {
+                                    const pct = user.quota > 0 ? (user.closed / user.quota * 100) : 0;
+                                    return `
+                                        <div class="p-4 rounded-lg bg-slate-800/50 border border-slate-700">
+                                            <div class="flex items-center gap-3 mb-3">
+                                                <img src="https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=6366f1&color=fff" class="w-10 h-10 rounded-full">
+                                                <div>
+                                                    <p class="font-medium text-white text-sm">${user.name}</p>
+                                                    <p class="text-xs text-slate-500">${user.role}</p>
+                                                </div>
+                                            </div>
+                                            <div class="flex justify-between text-sm mb-1">
+                                                <span class="text-slate-400">Quota attainment</span>
+                                                <span class="text-white font-medium">${pct.toFixed(0)}%</span>
+                                            </div>
+                                            <div class="h-2 bg-slate-700 rounded-full overflow-hidden">
+                                                <div class="h-full progress-bar rounded-full" style="width: ${Math.min(pct, 100)}%"></div>
+                                            </div>
+                                            <div class="flex justify-between text-xs mt-2 text-slate-500">
+                                                <span>$${(user.closed/1000).toFixed(0)}K closed</span>
+                                                <span>$${(user.quota/1000).toFixed(0)}K target</span>
+                                            </div>
+                                        </div>
+                                    `;
+                                }).join('')}
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                setTimeout(() => this.initCharts(), 100);
+            },
+
+            initCharts() {
+                const revCtx = document.getElementById('revenueChart');
+                if (revCtx) {
+                    new Chart(revCtx, {
+                        type: 'line',
+                        data: {
+                            labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+                            datasets: [{
+                                label: 'Revenue',
+                                data: [320, 380, 420, 390, 450, 485],
+                                borderColor: '#6366f1',
+                                backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                                fill: true,
+                                tension: 0.4,
+                                pointBackgroundColor: '#6366f1',
+                                pointBorderColor: '#fff',
+                                pointBorderWidth: 2,
+                                pointRadius: 4
+                            }, {
+                                label: 'Target',
+                                data: [300, 350, 400, 420, 450, 480],
+                                borderColor: '#94a3b8',
+                                borderDash: [5, 5],
+                                fill: false,
+                                tension: 0.4,
+                                pointRadius: 0
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: { legend: { display: false } },
+                            scales: {
+                                y: { grid: { color: 'rgba(148, 163, 184, 0.1)' }, ticks: { color: '#94a3b8' } },
+                                x: { grid: { display: false }, ticks: { color: '#94a3b8' } }
+                            }
+                        }
+                    });
+                }
+
+                const funnelCtx = document.getElementById('funnelChart');
+                if (funnelCtx) {
+                    new Chart(funnelCtx, {
+                        type: 'doughnut',
+                        data: {
+                            labels: ['Qualification', 'Discovery', 'Proposal', 'Negotiation', 'Closed'],
+                            datasets: [{
+                                data: [100, 65, 45, 30, 25],
+                                backgroundColor: ['#64748b', '#3b82f6', '#6366f1', '#f59e0b', '#10b981'],
+                                borderWidth: 0
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            cutout: '65%',
+                            plugins: { legend: { position: 'right', labels: { color: '#94a3b8', boxWidth: 12, padding: 15 } } }
+                        }
+                    });
+                }
+            },
+
+            // ==================== LEADS ====================
+            renderLeads(container) {
+                container.innerHTML = `
+                    <div class="animate-fade-in space-y-6">
+                        <div class="flex justify-between items-center">
+                            <div class="flex gap-2">
+                                <button onclick="app.showModal('addLead')" class="px-4 py-2 bg-primary-600 hover:bg-primary-500 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
+                                    <i class="fas fa-plus"></i> Add Lead
+                                </button>
+                                <button class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
+                                    <i class="fas fa-upload"></i> Import
+                                </button>
+                            </div>
+                            <div class="flex gap-2">
+                                <input type="text" placeholder="Search leads..." onkeyup="app.filterLeads(this.value)" class="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-primary-500">
+                                <select class="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-300">
+                                    <option>All Status</option>
+                                    <option>Hot</option>
+                                    <option>Warm</option>
+                                    <option>Cold</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="glass rounded-xl border border-slate-800 overflow-hidden">
+                            <div class="overflow-x-auto">
+                                <table class="w-full">
+                                    <thead>
+                                        <tr class="border-b border-slate-800 bg-slate-900/50">
+                                            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Lead</th>
+                                            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Contact</th>
+                                            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Source</th>
+                                            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Score</th>
+                                            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Status</th>
+                                            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Assigned</th>
+                                            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Last Activity</th>
+                                            <th class="px-4 py-3 text-right text-xs font-semibold text-slate-400 uppercase tracking-wider">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="leadsTableBody" class="divide-y divide-slate-800">
+                                        ${this.renderLeadsRows(store.leads)}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div class="glass rounded-xl p-6 border border-slate-800">
+                                <h3 class="font-semibold text-white mb-4">Lead Sources</h3>
+                                <div class="space-y-3">
+                                    ${['Website', 'LinkedIn', 'Referral', 'Trade Show', 'Email Campaign', 'Google Ads', 'Cold Call'].map(source => {
+                                        const count = store.leads.filter(l => l.source === source).length;
+                                        const pct = (count / store.leads.length * 100) || 0;
+                                        return `
+                                            <div class="flex items-center gap-3">
+                                                <span class="text-sm text-slate-400 w-28">${source}</span>
+                                                <div class="flex-1 h-2 bg-slate-800 rounded-full overflow-hidden">
+                                                    <div class="h-full bg-primary-500 rounded-full" style="width: ${pct}%"></div>
+                                                </div>
+                                                <span class="text-sm text-white w-8 text-right">${count}</span>
+                                            </div>
+                                        `;
+                                    }).join('')}
+                                </div>
+                            </div>
+                            <div class="glass rounded-xl p-6 border border-slate-800">
+                                <h3 class="font-semibold text-white mb-4">Lead Scoring Distribution</h3>
+                                <div class="flex items-end justify-around h-40 gap-2">
+                                    ${[0, 20, 40, 60, 80, 100].map((range, i) => {
+                                        const count = store.leads.filter(l => l.score >= range && l.score < (range + 20)).length;
+                                        const height = Math.max(count * 20, 4);
+                                        return `
+                                            <div class="flex flex-col items-center gap-2 flex-1">
+                                                <div class="w-full bg-primary-500/20 rounded-t-lg relative group" style="height: ${height}px">
+                                                    <div class="absolute -top-8 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                                                        ${count} leads
+                                                    </div>
+                                                </div>
+                                                <span class="text-xs text-slate-500">${range}-${range+19}</span>
+                                            </div>
+                                        `;
+                                    }).join('')}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            },
+
+            renderLeadsRows(leads) {
+                return leads.map(lead => {
+                    const statusColors = { Hot: 'bg-danger-500/20 text-danger-400 border-danger-500/30', Warm: 'bg-warning-500/20 text-warning-400 border-warning-500/30', Cold: 'bg-slate-500/20 text-slate-400 border-slate-500/30' };
+                    const scoreColor = lead.score >= 80 ? 'text-success-400' : lead.score >= 50 ? 'text-warning-400' : 'text-slate-400';
+                    return `
+                        <tr class="hover:bg-slate-800/50 transition-colors group">
+                            <td class="px-4 py-3">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-8 h-8 rounded-full bg-primary-600 flex items-center justify-center text-white text-xs font-bold">
+                                        ${lead.name.split(' ').map(n => n[0]).join('')}
+                                    </div>
+                                    <div>
+                                        <p class="text-sm font-medium text-white">${lead.name}</p>
+                                        <p class="text-xs text-slate-500">${lead.company}</p>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="px-4 py-3">
+                                <div class="text-sm text-slate-300">${lead.email}</div>
+                                <div class="text-xs text-slate-500">${lead.phone}</div>
+                            </td>
+                            <td class="px-4 py-3">
+                                <span class="text-sm text-slate-300">${lead.source}</span>
+                            </td>
+                            <td class="px-4 py-3">
+                                <span class="text-sm font-bold ${scoreColor}">${lead.score}</span>
+                            </td>
+                            <td class="px-4 py-3">
+                                <span class="px-2 py-1 rounded-full text-xs font-medium border ${statusColors[lead.status]}">${lead.status}</span>
+                            </td>
+                            <td class="px-4 py-3 text-sm text-slate-300">${lead.assigned}</td>
+                            <td class="px-4 py-3 text-sm text-slate-400">${lead.lastActivity}</td>
+                            <td class="px-4 py-3 text-right">
+                                <button onclick="app.convertToOpportunity(${lead.id})" class="text-primary-400 hover:text-primary-300 text-sm mr-3" title="Convert to Opportunity">
+                                    <i class="fas fa-exchange-alt"></i>
+                                </button>
+                                <button onclick="app.editLead(${lead.id})" class="text-slate-400 hover:text-white text-sm mr-3">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button onclick="app.deleteLead(${lead.id})" class="text-slate-400 hover:text-danger-400 text-sm">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+            },
+
+            filterLeads(query) {
+                const filtered = store.leads.filter(l => 
+                    l.name.toLowerCase().includes(query.toLowerCase()) ||
+                    l.company.toLowerCase().includes(query.toLowerCase()) ||
+                    l.email.toLowerCase().includes(query.toLowerCase())
+                );
+                document.getElementById('leadsTableBody').innerHTML = this.renderLeadsRows(filtered);
+            },
+
+            convertToOpportunity(leadId) {
+                const lead = store.leads.find(l => l.id === leadId);
+                if (lead) {
+                    const newOpp = {
+                        id: store.opportunities.length + 1,
+                        name: `${lead.company} - New Opportunity`,
+                        company: lead.company,
+                        contact: lead.name,
+                        value: 0,
+                        stage: 'Qualification',
+                        probability: 10,
+                        expectedClose: '2026-06-30',
+                        assigned: lead.assigned,
+                        lastActivity: 'Just now',
+                        nextAction: 'Initial discovery call',
+                        priority: 'Medium'
+                    };
+                    store.opportunities.push(newOpp);
+                    store.leads = store.leads.filter(l => l.id !== leadId);
+                    document.getElementById('leadBadge').textContent = store.leads.length;
+                    this.showToast('Lead converted to opportunity successfully', 'success');
+                    this.renderPage('leads');
+                }
+            },
+
+            // ==================== CONTACTS ====================
+            renderContacts(container) {
+                container.innerHTML = `
+                    <div class="animate-fade-in space-y-6">
+                        <div class="flex justify-between items-center">
+                            <div class="flex gap-2">
+                                <button onclick="app.showModal('addContact')" class="px-4 py-2 bg-primary-600 hover:bg-primary-500 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
+                                    <i class="fas fa-plus"></i> Add Contact
+                                </button>
+                                <button class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm font-medium transition-colors">
+                                    <i class="fas fa-building"></i> Add Account
+                                </button>
+                            </div>
+                            <div class="flex gap-2">
+                                <div class="relative">
+                                    <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm"></i>
+                                    <input type="text" placeholder="Search contacts..." class="pl-9 pr-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-primary-500 w-64">
+                                </div>
+                                <button class="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-400 hover:text-white">
+                                    <i class="fas fa-filter"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            ${store.contacts.map(contact => `
+                                <div class="glass rounded-xl p-5 border border-slate-800 hover:border-slate-700 transition-all cursor-pointer group" onclick="app.viewContact(${contact.id})">
+                                    <div class="flex items-start justify-between mb-4">
+                                        <div class="flex items-center gap-3">
+                                            <img src="https://ui-avatars.com/api/?name=${encodeURIComponent(contact.name)}&background=6366f1&color=fff" class="w-12 h-12 rounded-full ring-2 ring-slate-700 group-hover:ring-primary-500 transition-all">
+                                            <div>
+                                                <h4 class="font-semibold text-white">${contact.name}</h4>
+                                                <p class="text-sm text-slate-400">${contact.role}</p>
+                                            </div>
+                                        </div>
+                                        <span class="px-2 py-1 rounded-full text-xs font-medium ${contact.type === 'Customer' ? 'bg-success-500/20 text-success-400' : contact.type === 'Prospect' ? 'bg-primary-500/20 text-primary-400' : 'bg-accent-500/20 text-accent-400'}">${contact.type}</span>
+                                    </div>
+                                    <div class="space-y-2 mb-4">
+                                        <div class="flex items-center gap-2 text-sm text-slate-400">
+                                            <i class="fas fa-building w-4 text-center"></i>
+                                            <span>${contact.company}</span>
+                                        </div>
+                                        <div class="flex items-center gap-2 text-sm text-slate-400">
+                                            <i class="fas fa-envelope w-4 text-center"></i>
+                                            <span class="truncate">${contact.email}</span>
+                                        </div>
+                                        <div class="flex items-center gap-2 text-sm text-slate-400">
+                                            <i class="fas fa-phone w-4 text-center"></i>
+                                            <span>${contact.phone}</span>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center justify-between pt-3 border-t border-slate-800">
+                                        <div class="text-sm">
+                                            <span class="text-slate-500">Lifetime Value:</span>
+                                            <span class="text-white font-medium">$${(contact.value/1000).toFixed(0)}K</span>
+                                        </div>
+                                        <div class="text-sm">
+                                            <span class="text-slate-500">Deals:</span>
+                                            <span class="text-white font-medium">${contact.deals}</span>
+                                        </div>
+                                    </div>
+                                    <div class="mt-3 flex gap-2">
+                                        <button class="flex-1 py-1.5 bg-primary-600/20 hover:bg-primary-600/30 text-primary-400 rounded text-xs font-medium transition-colors">
+                                            <i class="fas fa-envelope mr-1"></i> Email
+                                        </button>
+                                        <button class="flex-1 py-1.5 bg-success-600/20 hover:bg-success-600/30 text-success-400 rounded text-xs font-medium transition-colors">
+                                            <i class="fas fa-phone mr-1"></i> Call
+                                        </button>
+                                        <button class="flex-1 py-1.5 bg-accent-600/20 hover:bg-accent-600/30 text-accent-400 rounded text-xs font-medium transition-colors">
+                                            <i class="fas fa-calendar mr-1"></i> Meet
+                                        </button>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+
+                        <div class="glass rounded-xl p-6 border border-slate-800">
+                            <h3 class="font-semibold text-white mb-4">Account Relationship Map</h3>
+                            <div class="flex items-center justify-center py-8">
+                                <div class="relative">
+                                    <div class="w-48 p-4 bg-primary-600/20 border border-primary-500/30 rounded-xl text-center">
+                                        <i class="fas fa-building text-primary-400 text-2xl mb-2"></i>
+                                        <p class="font-semibold text-white">TechVentures Inc</p>
+                                        <p class="text-xs text-slate-400">Enterprise Account</p>
+                                    </div>
+                                    <div class="absolute top-full left-1/2 -translate-x-1/2 w-px h-8 bg-slate-600"></div>
+                                    <div class="absolute top-full left-1/2 -translate-x-1/2 mt-8 flex gap-8">
+                                        <div class="w-px h-8 bg-slate-600 absolute -top-8 left-1/2 -translate-x-1/2"></div>
+                                        ${['Sarah Chen (VP Eng)', 'Mike Ross (CTO)', 'Lisa Park (Finance)'].map((name, i) => `
+                                            <div class="w-36 p-3 bg-slate-800 border border-slate-700 rounded-lg text-center">
+                                                <div class="w-8 h-8 rounded-full bg-slate-700 mx-auto mb-2 flex items-center justify-center text-xs text-white">
+                                                    ${name.split(' ').map(n => n[0]).join('')}
+                                                </div>
+                                                <p class="text-xs font-medium text-white">${name}</p>
+                                            </div>
+                                        `).join('')}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            },
+
+            viewContact(id) {
+                const contact = store.contacts.find(c => c.id === id);
+                this.showToast(`Viewing ${contact.name}'s profile`, 'info');
+            },
+
+            // ==================== PIPELINE (KANBAN) ====================
+            renderPipeline(container) {
+                const stages = ['Qualification', 'Discovery', 'Proposal', 'Negotiation', 'Closed Won'];
+                const stageColors = { 'Qualification': 'border-slate-500', 'Discovery': 'border-primary-500', 'Proposal': 'border-accent-500', 'Negotiation': 'border-warning-500', 'Closed Won': 'border-success-500' };
+                const stageBg = { 'Qualification': 'bg-slate-500/10', 'Discovery': 'bg-primary-500/10', 'Proposal': 'bg-accent-500/10', 'Negotiation': 'bg-warning-500/10', 'Closed Won': 'bg-success-500/10' };
+
+                container.innerHTML = `
+                    <div class="animate-fade-in space-y-6">
+                        <div class="flex justify-between items-center">
+                            <div class="flex gap-2">
+                                <button onclick="app.showModal('addOpportunity')" class="px-4 py-2 bg-primary-600 hover:bg-primary-500 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
+                                    <i class="fas fa-plus"></i> Add Opportunity
+                                </button>
+                                <button class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm font-medium transition-colors">
+                                    <i class="fas fa-filter"></i> Filter
+                                </button>
+                            </div>
+                            <div class="flex gap-2">
+                                <button class="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-400 hover:text-white">
+                                    <i class="fas fa-list"></i>
+                                </button>
+                                <button class="px-3 py-2 bg-primary-600 border border-primary-500 rounded-lg text-white">
+                                    <i class="fas fa-columns"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="flex gap-4 overflow-x-auto pb-4" style="min-height: 500px;">
+                            ${stages.map(stage => {
+                                const stageOpps = store.opportunities.filter(o => o.stage === stage);
+                                const stageValue = stageOpps.reduce((sum, o) => sum + o.value, 0);
+                                return `
+                                    <div class="flex-shrink-0 w-80" ondragover="app.allowDrop(event, '${stage}')" ondrop="app.drop(event, '${stage}')" ondragleave="app.dragLeave(event)">
+                                        <div class="flex items-center justify-between mb-3 px-1">
+                                            <div class="flex items-center gap-2">
+                                                <div class="w-3 h-3 rounded-full ${stage === 'Closed Won' ? 'bg-success-500' : stage === 'Negotiation' ? 'bg-warning-500' : stage === 'Proposal' ? 'bg-accent-500' : stage === 'Discovery' ? 'bg-primary-500' : 'bg-slate-500'}"></div>
+                                                <h3 class="font-semibold text-white text-sm">${stage}</h3>
+                                                <span class="text-xs text-slate-500 bg-slate-800 px-2 py-0.5 rounded-full">${stageOpps.length}</span>
+                                            </div>
+                                            <span class="text-xs text-slate-400 font-medium">$${(stageValue/1000).toFixed(0)}K</span>
+                                        </div>
+                                        <div class="space-y-3 min-h-[200px] p-2 rounded-xl ${stageBg[stage]} border border-slate-800/50">
+                                            ${stageOpps.map(opp => `
+                                                <div class="kanban-card glass rounded-lg p-4 border border-slate-700 hover:border-slate-600" draggable="true" ondragstart="app.drag(event, ${opp.id})">
+                                                    <div class="flex justify-between items-start mb-2">
+                                                        <h4 class="font-medium text-white text-sm">${opp.name}</h4>
+                                                        <span class="text-xs font-bold ${opp.priority === 'High' ? 'text-danger-400' : opp.priority === 'Medium' ? 'text-warning-400' : 'text-slate-400'}">${opp.priority}</span>
+                                                    </div>
+                                                    <p class="text-xs text-slate-400 mb-2">${opp.company}</p>
+                                                    <div class="flex items-center justify-between mb-3">
+                                                        <span class="text-sm font-semibold text-white">$${(opp.value/1000).toFixed(0)}K</span>
+                                                        <span class="text-xs text-slate-500">${opp.probability}% prob</span>
+                                                    </div>
+                                                    <div class="h-1.5 bg-slate-700 rounded-full overflow-hidden mb-2">
+                                                        <div class="h-full ${opp.probability >= 70 ? 'bg-success-500' : opp.probability >= 40 ? 'bg-warning-500' : 'bg-primary-500'} rounded-full" style="width: ${opp.probability}%"></div>
+                                                    </div>
+                                                    <div class="flex items-center justify-between text-xs text-slate-500">
+                                                        <span><i class="far fa-calendar mr-1"></i>${opp.expectedClose}</span>
+                                                        <div class="flex items-center gap-1">
+                                                            <img src="https://ui-avatars.com/api/?name=${encodeURIComponent(opp.assigned)}&background=6366f1&color=fff&size=16" class="w-5 h-5 rounded-full">
+                                                            <span>${opp.assigned.split(' ')[0]}</span>
+                                                        </div>
+                                                    </div>
+                                                    <div class="mt-2 pt-2 border-t border-slate-700/50 flex items-center gap-2 text-xs">
+                                                        <i class="fas fa-arrow-right text-primary-400"></i>
+                                                        <span class="text-slate-400">${opp.nextAction}</span>
+                                                    </div>
+                                                </div>
+                                            `).join('')}
+                                            ${stageOpps.length === 0 ? '<div class="text-center py-8 text-slate-600 text-sm">No deals in this stage</div>' : ''}
+                                        </div>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+
+                        <div class="glass rounded-xl p-6 border border-slate-800">
+                            <h3 class="font-semibold text-white mb-4">Forecast Analysis</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div class="p-4 rounded-lg bg-slate-800/50 border border-slate-700">
+                                    <p class="text-sm text-slate-400 mb-1">Best Case</p>
+                                    <p class="text-2xl font-bold text-success-400">$${(store.opportunities.filter(o => o.stage !== 'Closed Won').reduce((sum, o) => sum + o.value, 0) * 1.2 / 1000).toFixed(0)}K</p>
+                                    <p class="text-xs text-slate-500 mt-1">120% of pipeline</p>
+                                </div>
+                                <div class="p-4 rounded-lg bg-slate-800/50 border border-slate-700">
+                                    <p class="text-sm text-slate-400 mb-1">Commit</p>
+                                    <p class="text-2xl font-bold text-primary-400">$${(store.opportunities.filter(o => o.stage !== 'Closed Won').reduce((sum, o) => sum + (o.value * o.probability / 100), 0) / 1000).toFixed(0)}K</p>
+                                    <p class="text-xs text-slate-500 mt-1">Weighted by probability</p>
+                                </div>
+                                <div class="p-4 rounded-lg bg-slate-800/50 border border-slate-700">
+                                    <p class="text-sm text-slate-400 mb-1">Closed Won</p>
+                                    <p class="text-2xl font-bold text-accent-400">$${(store.opportunities.filter(o => o.stage === 'Closed Won').reduce((sum, o) => sum + o.value, 0) / 1000).toFixed(0)}K</p>
+                                    <p class="text-xs text-slate-500 mt-1">This quarter</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            },
+
+            drag(event, id) {
+                this.draggedItem = id;
+                event.dataTransfer.setData('text/plain', id);
+                event.target.style.opacity = '0.5';
+            },
+
+            allowDrop(event, stage) {
+                event.preventDefault();
+                const column = event.currentTarget;
+                column.querySelector('.min-h-\[200px\]').classList.add('drag-over');
+            },
+
+            dragLeave(event) {
+                const column = event.currentTarget;
+                column.querySelector('.min-h-\[200px\]').classList.remove('drag-over');
+            },
+
+            drop(event, stage) {
+                event.preventDefault();
+                const column = event.currentTarget;
+                column.querySelector('.min-h-\[200px\]').classList.remove('drag-over');
+
+                const id = parseInt(this.draggedItem);
+                const opp = store.opportunities.find(o => o.id === id);
+                if (opp) {
+                    opp.stage = stage;
+                    opp.probability = stage === 'Closed Won' ? 100 : stage === 'Negotiation' ? 75 : stage === 'Proposal' ? 50 : stage === 'Discovery' ? 30 : 20;
+                    opp.lastActivity = 'Just now';
+                    this.showToast(`Moved "${opp.name}" to ${stage}`, 'success');
+                    this.renderPage('pipeline');
+                }
+                this.draggedItem = null;
+            },
+
+            // ==================== ACTIVITIES ====================
+            renderActivities(container) {
+                container.innerHTML = `
+                    <div class="animate-fade-in space-y-6">
+                        <div class="flex justify-between items-center">
+                            <div class="flex gap-2">
+                                <button onclick="app.showModal('addActivity')" class="px-4 py-2 bg-primary-600 hover:bg-primary-500 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
+                                    <i class="fas fa-plus"></i> Add Activity
+                                </button>
+                                <button class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm font-medium transition-colors">
+                                    <i class="fas fa-calendar-alt"></i> Calendar View
+                                </button>
+                            </div>
+                            <div class="flex gap-2">
+                                <select class="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-300">
+                                    <option>All Types</option>
+                                    <option>Calls</option>
+                                    <option>Meetings</option>
+                                    <option>Tasks</option>
+                                    <option>Emails</option>
+                                </select>
+                                <select class="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-300">
+                                    <option>All Status</option>
+                                    <option>Completed</option>
+                                    <option>Scheduled</option>
+                                    <option>Pending</option>
+                                    <option>Overdue</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                            <div class="lg:col-span-2 space-y-3">
+                                ${store.activities.map(act => {
+                                    const icons = { call: 'phone', meeting: 'video', task: 'check-square', email: 'envelope' };
+                                    const colors = { call: 'bg-primary-500/20 text-primary-400', meeting: 'bg-accent-500/20 text-accent-400', task: 'bg-success-500/20 text-success-400', email: 'bg-warning-500/20 text-warning-400' };
+                                    const statusColors = { Completed: 'bg-success-500/20 text-success-400 border-success-500/30', Scheduled: 'bg-primary-500/20 text-primary-400 border-primary-500/30', Pending: 'bg-warning-500/20 text-warning-400 border-warning-500/30', Overdue: 'bg-danger-500/20 text-danger-400 border-danger-500/30' };
+                                    const priorityColors = { High: 'text-danger-400', Medium: 'text-warning-400', Low: 'text-slate-400' };
+                                    return `
+                                        <div class="glass rounded-xl p-4 border border-slate-800 hover:border-slate-700 transition-all">
+                                            <div class="flex items-start gap-4">
+                                                <div class="w-10 h-10 rounded-lg ${colors[act.type]} flex items-center justify-center flex-shrink-0">
+                                                    <i class="fas fa-${icons[act.type]}"></i>
+                                                </div>
+                                                <div class="flex-1 min-w-0">
+                                                    <div class="flex items-center justify-between mb-1">
+                                                        <h4 class="font-medium text-white text-sm">${act.title}</h4>
+                                                        <span class="px-2 py-0.5 rounded-full text-xs font-medium border ${statusColors[act.status]}">${act.status}</span>
+                                                    </div>
+                                                    <p class="text-xs text-slate-500 mb-2">${act.contact} • Due: ${act.due}</p>
+                                                    <p class="text-sm text-slate-400 mb-3">${act.notes}</p>
+                                                    <div class="flex items-center gap-3">
+                                                        <span class="text-xs ${priorityColors[act.priority]}"><i class="fas fa-flag mr-1"></i>${act.priority} Priority</span>
+                                                        <div class="flex gap-2 ml-auto">
+                                                            ${act.status !== 'Completed' ? `<button onclick="app.completeActivity(${act.id})" class="text-xs bg-success-600/20 hover:bg-success-600/30 text-success-400 px-3 py-1 rounded transition-colors">Complete</button>` : ''}
+                                                            <button class="text-xs bg-slate-700 hover:bg-slate-600 text-slate-300 px-3 py-1 rounded transition-colors">Edit</button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    `;
+                                }).join('')}
+                            </div>
+
+                            <div class="space-y-4">
+                                <div class="glass rounded-xl p-5 border border-slate-800">
+                                    <h3 class="font-semibold text-white mb-4">Activity Summary</h3>
+                                    <div class="space-y-3">
+                                        <div class="flex justify-between items-center">
+                                            <span class="text-sm text-slate-400">Completed</span>
+                                            <span class="text-sm font-medium text-success-400">${store.activities.filter(a => a.status === 'Completed').length}</span>
+                                        </div>
+                                        <div class="flex justify-between items-center">
+                                            <span class="text-sm text-slate-400">Scheduled</span>
+                                            <span class="text-sm font-medium text-primary-400">${store.activities.filter(a => a.status === 'Scheduled').length}</span>
+                                        </div>
+                                        <div class="flex justify-between items-center">
+                                            <span class="text-sm text-slate-400">Pending</span>
+                                            <span class="text-sm font-medium text-warning-400">${store.activities.filter(a => a.status === 'Pending').length}</span>
+                                        </div>
+                                        <div class="flex justify-between items-center">
+                                            <span class="text-sm text-slate-400">Overdue</span>
+                                            <span class="text-sm font-medium text-danger-400">${store.activities.filter(a => a.status === 'Overdue').length}</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="glass rounded-xl p-5 border border-slate-800">
+                                    <h3 class="font-semibold text-white mb-4">Today's Schedule</h3>
+                                    <div class="space-y-3">
+                                        <div class="flex gap-3">
+                                            <div class="w-14 text-xs text-slate-500 text-right pt-1">14:00</div>
+                                            <div class="flex-1 pb-3 border-l-2 border-primary-500 pl-3">
+                                                <p class="text-sm text-white font-medium">Discovery Call</p>
+                                                <p class="text-xs text-slate-400">TechVentures Inc</p>
+                                            </div>
+                                        </div>
+                                        <div class="flex gap-3">
+                                            <div class="w-14 text-xs text-slate-500 text-right pt-1">16:00</div>
+                                            <div class="flex-1 pb-3 border-l-2 border-warning-500 pl-3">
+                                                <p class="text-sm text-white font-medium">Follow-up Email</p>
+                                                <p class="text-xs text-slate-400">DataFlow Systems</p>
+                                            </div>
+                                        </div>
+                                        <div class="flex gap-3">
+                                            <div class="w-14 text-xs text-slate-500 text-right pt-1">17:00</div>
+                                            <div class="flex-1 border-l-2 border-accent-500 pl-3">
+                                                <p class="text-sm text-white font-medium">Send Proposal</p>
+                                                <p class="text-xs text-slate-400">InnovateSoft</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            },
+
+            completeActivity(id) {
+                const act = store.activities.find(a => a.id === id);
+                if (act) {
+                    act.status = 'Completed';
+                    this.showToast(`Activity "${act.title}" completed`, 'success');
+                    this.renderPage('activities');
+                }
+            },
+
+            // ==================== QUOTES ====================
+            renderQuotes(container) {
+                container.innerHTML = `
+                    <div class="animate-fade-in space-y-6">
+                        <div class="flex justify-between items-center">
+                            <div class="flex gap-2">
+                                <button onclick="app.showModal('createQuote')" class="px-4 py-2 bg-primary-600 hover:bg-primary-500 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
+                                    <i class="fas fa-plus"></i> Create Quote
+                                </button>
+                                <button class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm font-medium transition-colors">
+                                    <i class="fas fa-copy"></i> Templates
+                                </button>
+                            </div>
+                            <div class="flex gap-2">
+                                <input type="text" placeholder="Search quotes..." class="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-primary-500">
+                            </div>
+                        </div>
+
+                        <div class="glass rounded-xl border border-slate-800 overflow-hidden">
+                            <div class="overflow-x-auto">
+                                <table class="w-full">
+                                    <thead>
+                                        <tr class="border-b border-slate-800 bg-slate-900/50">
+                                            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Quote ID</th>
+                                            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Customer</th>
+                                            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Date</th>
+                                            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Expiry</th>
+                                            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Items</th>
+                                            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Discount</th>
+                                            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Total</th>
+                                            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Status</th>
+                                            <th class="px-4 py-3 text-right text-xs font-semibold text-slate-400 uppercase tracking-wider">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-slate-800">
+                                        ${store.quotes.map(quote => {
+                                            const statusColors = { Draft: 'bg-slate-500/20 text-slate-400 border-slate-500/30', Sent: 'bg-primary-500/20 text-primary-400 border-primary-500/30', Accepted: 'bg-success-500/20 text-success-400 border-success-500/30', Rejected: 'bg-danger-500/20 text-danger-400 border-danger-500/30' };
+                                            return `
+                                                <tr class="hover:bg-slate-800/50 transition-colors">
+                                                    <td class="px-4 py-3 text-sm font-medium text-white">${quote.id}</td>
+                                                    <td class="px-4 py-3">
+                                                        <p class="text-sm text-white">${quote.customer}</p>
+                                                        <p class="text-xs text-slate-500">${quote.contact}</p>
+                                                    </td>
+                                                    <td class="px-4 py-3 text-sm text-slate-400">${quote.date}</td>
+                                                    <td class="px-4 py-3 text-sm text-slate-400">${quote.expiry}</td>
+                                                    <td class="px-4 py-3 text-sm text-slate-400">${quote.items} items</td>
+                                                    <td class="px-4 py-3 text-sm text-slate-400">${quote.discount}%</td>
+                                                    <td class="px-4 py-3 text-sm font-semibold text-white">$${(quote.total/1000).toFixed(1)}K</td>
+                                                    <td class="px-4 py-3">
+                                                        <span class="px-2 py-1 rounded-full text-xs font-medium border ${statusColors[quote.status]}">${quote.status}</span>
+                                                    </td>
+                                                    <td class="px-4 py-3 text-right">
+                                                        <button onclick="app.convertQuoteToOrder('${quote.id}')" class="text-primary-400 hover:text-primary-300 text-sm mr-3" title="Convert to Order">
+                                                            <i class="fas fa-shopping-cart"></i>
+                                                        </button>
+                                                        <button class="text-slate-400 hover:text-white text-sm mr-3">
+                                                            <i class="fas fa-edit"></i>
+                                                        </button>
+                                                        <button class="text-slate-400 hover:text-primary-400 text-sm">
+                                                            <i class="fas fa-file-pdf"></i>
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            `;
+                                        }).join('')}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div class="glass rounded-xl p-6 border border-slate-800">
+                                <h3 class="font-semibold text-white mb-4">Quote Performance</h3>
+                                <div class="flex items-center justify-center h-48">
+                                    <div class="relative w-40 h-40">
+                                        <svg viewBox="0 0 100 100" class="transform -rotate-90 w-full h-full">
+                                            <circle cx="50" cy="50" r="40" fill="none" stroke="#1e293b" stroke-width="12"/>
+                                            <circle cx="50" cy="50" r="40" fill="none" stroke="#10b981" stroke-width="12" stroke-dasharray="${2 * Math.PI * 40 * 0.65}" stroke-dashoffset="0" stroke-linecap="round"/>
+                                            <circle cx="50" cy="50" r="40" fill="none" stroke="#f59e0b" stroke-width="12" stroke-dasharray="${2 * Math.PI * 40 * 0.25}" stroke-dashoffset="${-2 * Math.PI * 40 * 0.65}" stroke-linecap="round"/>
+                                            <circle cx="50" cy="50" r="40" fill="none" stroke="#ef4444" stroke-width="12" stroke-dasharray="${2 * Math.PI * 40 * 0.10}" stroke-dashoffset="${-2 * Math.PI * 40 * 0.90}" stroke-linecap="round"/>
+                                        </svg>
+                                        <div class="absolute inset-0 flex flex-col items-center justify-center">
+                                            <span class="text-2xl font-bold text-white">65%</span>
+                                            <span class="text-xs text-slate-500">Win Rate</span>
+                                        </div>
+                                    </div>
+                                    <div class="ml-6 space-y-2">
+                                        <div class="flex items-center gap-2">
+                                            <div class="w-3 h-3 rounded-full bg-success-500"></div>
+                                            <span class="text-sm text-slate-400">Accepted (65%)</span>
+                                        </div>
+                                        <div class="flex items-center gap-2">
+                                            <div class="w-3 h-3 rounded-full bg-warning-500"></div>
+                                            <span class="text-sm text-slate-400">Pending (25%)</span>
+                                        </div>
+                                        <div class="flex items-center gap-2">
+                                            <div class="w-3 h-3 rounded-full bg-danger-500"></div>
+                                            <span class="text-sm text-slate-400">Rejected (10%)</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="glass rounded-xl p-6 border border-slate-800">
+                                <h3 class="font-semibold text-white mb-4">Quote Value Trend</h3>
+                                <div class="h-48">
+                                    <canvas id="quoteChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                setTimeout(() => {
+                    const ctx = document.getElementById('quoteChart');
+                    if (ctx) {
+                        new Chart(ctx, {
+                            type: 'bar',
+                            data: {
+                                labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+                                datasets: [{
+                                    label: 'Quote Value',
+                                    data: [120, 150, 180, 140, 200, 220],
+                                    backgroundColor: '#6366f1',
+                                    borderRadius: 4
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                plugins: { legend: { display: false } },
+                                scales: {
+                                    y: { grid: { color: 'rgba(148, 163, 184, 0.1)' }, ticks: { color: '#94a3b8' } },
+                                    x: { grid: { display: false }, ticks: { color: '#94a3b8' } }
+                                }
+                            }
+                        });
+                    }
+                }, 100);
+            },
+
+            convertQuoteToOrder(quoteId) {
+                const quote = store.quotes.find(q => q.id === quoteId);
+                if (quote) {
+                    const newOrder = {
+                        id: `SO-2026-${(1010 + store.orders.length).toString().slice(-3)}`,
+                        customer: quote.customer,
+                        contact: quote.contact,
+                        date: new Date().toISOString().split('T')[0],
+                        total: quote.total,
+                        status: "Processing",
+                        items: quote.items,
+                        payment: "Net 30"
+                    };
+                    store.orders.unshift(newOrder);
+                    this.showToast(`Quote ${quoteId} converted to order ${newOrder.id}`, 'success');
+                    this.renderPage('quotes');
+                }
+            },
+
+            // ==================== ORDERS ====================
+            renderOrders(container) {
+                container.innerHTML = `
+                    <div class="animate-fade-in space-y-6">
+                        <div class="flex justify-between items-center">
+                            <div class="flex gap-2">
+                                <button class="px-4 py-2 bg-primary-600 hover:bg-primary-500 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
+                                    <i class="fas fa-plus"></i> New Order
+                                </button>
+                                <button class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm font-medium transition-colors">
+                                    <i class="fas fa-file-export"></i> Export
+                                </button>
+                            </div>
+                            <div class="flex gap-2">
+                                <select class="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-300">
+                                    <option>All Status</option>
+                                    <option>Processing</option>
+                                    <option>Shipped</option>
+                                    <option>Delivered</option>
+                                    <option>Invoiced</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="glass rounded-xl border border-slate-800 overflow-hidden">
+                            <div class="overflow-x-auto">
+                                <table class="w-full">
+                                    <thead>
+                                        <tr class="border-b border-slate-800 bg-slate-900/50">
+                                            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Order ID</th>
+                                            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Customer</th>
+                                            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Date</th>
+                                            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Items</th>
+                                            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Total</th>
+                                            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Payment</th>
+                                            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Status</th>
+                                            <th class="px-4 py-3 text-right text-xs font-semibold text-slate-400 uppercase tracking-wider">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-slate-800">
+                                        ${store.orders.map(order => {
+                                            const statusColors = { Processing: 'bg-primary-500/20 text-primary-400 border-primary-500/30', Shipped: 'bg-accent-500/20 text-accent-400 border-accent-500/30', Delivered: 'bg-success-500/20 text-success-400 border-success-500/30', Invoiced: 'bg-warning-500/20 text-warning-400 border-warning-500/30' };
+                                            return `
+                                                <tr class="hover:bg-slate-800/50 transition-colors">
+                                                    <td class="px-4 py-3 text-sm font-medium text-white">${order.id}</td>
+                                                    <td class="px-4 py-3">
+                                                        <p class="text-sm text-white">${order.customer}</p>
+                                                        <p class="text-xs text-slate-500">${order.contact}</p>
+                                                    </td>
+                                                    <td class="px-4 py-3 text-sm text-slate-400">${order.date}</td>
+                                                    <td class="px-4 py-3 text-sm text-slate-400">${order.items} items</td>
+                                                    <td class="px-4 py-3 text-sm font-semibold text-white">$${(order.total/1000).toFixed(1)}K</td>
+                                                    <td class="px-4 py-3 text-sm text-slate-400">${order.payment}</td>
+                                                    <td class="px-4 py-3">
+                                                        <span class="px-2 py-1 rounded-full text-xs font-medium border ${statusColors[order.status]}">${order.status}</span>
+                                                    </td>
+                                                    <td class="px-4 py-3 text-right">
+                                                        <button class="text-slate-400 hover:text-white text-sm mr-3">
+                                                            <i class="fas fa-eye"></i>
+                                                        </button>
+                                                        <button class="text-slate-400 hover:text-primary-400 text-sm mr-3">
+                                                            <i class="fas fa-file-invoice"></i>
+                                                        </button>
+                                                        <button class="text-slate-400 hover:text-success-400 text-sm">
+                                                            <i class="fas fa-shipping-fast"></i>
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            `;
+                                        }).join('')}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div class="glass rounded-xl p-6 border border-slate-800">
+                            <h3 class="font-semibold text-white mb-4">Order Fulfillment Pipeline</h3>
+                            <div class="flex items-center justify-between">
+                                ${['Order Placed', 'Processing', 'Shipped', 'Delivered', 'Invoiced'].map((step, i) => {
+                                    const isActive = i <= 2;
+                                    const isCurrent = i === 2;
+                                    return `
+                                        <div class="flex items-center flex-1 ${i < 4 ? '' : ''}">
+                                            <div class="flex flex-col items-center">
+                                                <div class="w-10 h-10 rounded-full ${isActive ? 'bg-primary-600' : 'bg-slate-700'} flex items-center justify-center text-white mb-2 ${isCurrent ? 'ring-4 ring-primary-500/30' : ''}">
+                                                    <i class="fas fa-${i === 0 ? 'shopping-cart' : i === 1 ? 'cogs' : i === 2 ? 'truck' : i === 3 ? 'box-open' : 'file-invoice-dollar'}"></i>
+                                                </div>
+                                                <span class="text-xs ${isActive ? 'text-white' : 'text-slate-500'} font-medium">${step}</span>
+                                            </div>
+                                            ${i < 4 ? `<div class="flex-1 h-1 mx-2 ${isActive ? 'bg-primary-600' : 'bg-slate-700'} rounded-full"></div>` : ''}
+                                        </div>
+                                    `;
+                                }).join('')}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            },
+
+            // ==================== PRODUCTS ====================
+            renderProducts(container) {
+                container.innerHTML = `
+                    <div class="animate-fade-in space-y-6">
+                        <div class="flex justify-between items-center">
+                            <div class="flex gap-2">
+                                <button class="px-4 py-2 bg-primary-600 hover:bg-primary-500 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
+                                    <i class="fas fa-plus"></i> Add Product
+                                </button>
+                                <button class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm font-medium transition-colors">
+                                    <i class="fas fa-tags"></i> Price Lists
+                                </button>
+                            </div>
+                            <div class="flex gap-2">
+                                <input type="text" placeholder="Search products..." class="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-primary-500">
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            ${store.products.map(product => `
+                                <div class="glass rounded-xl p-5 border border-slate-800 hover:border-slate-700 transition-all">
+                                    <div class="flex items-start justify-between mb-3">
+                                        <div class="w-12 h-12 rounded-lg bg-primary-600/20 flex items-center justify-center">
+                                            <i class="fas fa-box text-primary-400 text-xl"></i>
+                                        </div>
+                                        <span class="px-2 py-1 rounded-full text-xs font-medium ${product.status === 'Active' ? 'bg-success-500/20 text-success-400' : 'bg-slate-500/20 text-slate-400'}">${product.status}</span>
+                                    </div>
+                                    <h4 class="font-semibold text-white mb-1">${product.name}</h4>
+                                    <p class="text-xs text-slate-500 mb-3">${product.sku} • ${product.category}</p>
+                                    <div class="flex items-center justify-between pt-3 border-t border-slate-800">
+                                        <div>
+                                            <p class="text-lg font-bold text-white">$${product.price.toLocaleString()}</p>
+                                            <p class="text-xs text-slate-500">per ${product.unit}</p>
+                                        </div>
+                                        <div class="text-right">
+                                            <p class="text-sm text-slate-400">Stock</p>
+                                            <p class="text-sm font-medium text-white">${product.stock}</p>
+                                        </div>
+                                    </div>
+                                    <div class="mt-3 flex gap-2">
+                                        <button class="flex-1 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded text-xs font-medium transition-colors">Edit</button>
+                                        <button class="flex-1 py-1.5 bg-primary-600/20 hover:bg-primary-600/30 text-primary-400 rounded text-xs font-medium transition-colors">Add to Quote</button>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+
+                        <div class="glass rounded-xl p-6 border border-slate-800">
+                            <h3 class="font-semibold text-white mb-4">Pricing Tiers</h3>
+                            <div class="overflow-x-auto">
+                                <table class="w-full">
+                                    <thead>
+                                        <tr class="border-b border-slate-800">
+                                            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Product</th>
+                                            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">List Price</th>
+                                            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Standard (5-9)</th>
+                                            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Volume (10-24)</th>
+                                            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Enterprise (25+)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-slate-800">
+                                        ${store.products.slice(0, 3).map(product => `
+                                            <tr>
+                                                <td class="px-4 py-3 text-sm text-white">${product.name}</td>
+                                                <td class="px-4 py-3 text-sm text-slate-400">$${product.price.toLocaleString()}</td>
+                                                <td class="px-4 py-3 text-sm text-success-400">$${(product.price * 0.9).toFixed(0)} <span class="text-xs text-slate-500">(-10%)</span></td>
+                                                <td class="px-4 py-3 text-sm text-success-400">$${(product.price * 0.8).toFixed(0)} <span class="text-xs text-slate-500">(-20%)</span></td>
+                                                <td class="px-4 py-3 text-sm text-success-400">$${(product.price * 0.7).toFixed(0)} <span class="text-xs text-slate-500">(-30%)</span></td>
+                                            </tr>
+                                        `).join('')}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            },
+
+            // ==================== REPORTS ====================
+            renderReports(container) {
+                container.innerHTML = `
+                    <div class="animate-fade-in space-y-6">
+                        <div class="flex justify-between items-center">
+                            <div class="flex gap-2">
+                                <button class="px-4 py-2 bg-primary-600 hover:bg-primary-500 text-white rounded-lg text-sm font-medium transition-colors">
+                                    <i class="fas fa-download mr-2"></i> Export Reports
+                                </button>
+                                <button class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm font-medium transition-colors">
+                                    <i class="fas fa-calendar mr-2"></i> Date Range
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            <div class="glass rounded-xl p-6 border border-slate-800">
+                                <h3 class="font-semibold text-white mb-4">Sales Conversion Funnel</h3>
+                                <div class="h-64">
+                                    <canvas id="conversionChart"></canvas>
+                                </div>
+                            </div>
+                            <div class="glass rounded-xl p-6 border border-slate-800">
+                                <h3 class="font-semibold text-white mb-4">Revenue by Rep</h3>
+                                <div class="h-64">
+                                    <canvas id="repChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="glass rounded-xl p-6 border border-slate-800">
+                            <h3 class="font-semibold text-white mb-4">Activity Heatmap</h3>
+                            <div class="grid grid-cols-7 gap-1">
+                                ${['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => `
+                                    <div class="text-center text-xs text-slate-500 mb-2">${day}</div>
+                                `).join('')}
+                                ${Array.from({length: 28}, (_, i) => {
+                                    const intensity = Math.random();
+                                    const color = intensity > 0.7 ? 'bg-primary-500' : intensity > 0.4 ? 'bg-primary-500/60' : intensity > 0.1 ? 'bg-primary-500/30' : 'bg-slate-800';
+                                    return `<div class="heatmap-cell aspect-square rounded ${color} cursor-pointer" title="${Math.floor(intensity * 10)} activities"></div>`;
+                                }).join('')}
+                            </div>
+                        </div>
+
+                        <div class="glass rounded-xl p-6 border border-slate-800">
+                            <h3 class="font-semibold text-white mb-4">Key Performance Indicators</h3>
+                            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                <div class="p-4 rounded-lg bg-slate-800/50 border border-slate-700 text-center">
+                                    <p class="text-3xl font-bold text-white mb-1">32%</p>
+                                    <p class="text-xs text-slate-400">Lead-to-Opp Conversion</p>
+                                    <p class="text-xs text-success-400 mt-1"><i class="fas fa-arrow-up mr-1"></i>4.2%</p>
+                                </div>
+                                <div class="p-4 rounded-lg bg-slate-800/50 border border-slate-700 text-center">
+                                    <p class="text-3xl font-bold text-white mb-1">28 days</p>
+                                    <p class="text-xs text-slate-400">Avg Sales Cycle</p>
+                                    <p class="text-xs text-success-400 mt-1"><i class="fas fa-arrow-down mr-1"></i>3 days</p>
+                                </div>
+                                <div class="p-4 rounded-lg bg-slate-800/50 border border-slate-700 text-center">
+                                    <p class="text-3xl font-bold text-white mb-1">$142K</p>
+                                    <p class="text-xs text-slate-400">Avg Deal Size</p>
+                                    <p class="text-xs text-success-400 mt-1"><i class="fas fa-arrow-up mr-1"></i>12%</p>
+                                </div>
+                                <div class="p-4 rounded-lg bg-slate-800/50 border border-slate-700 text-center">
+                                    <p class="text-3xl font-bold text-white mb-1">65%</p>
+                                    <p class="text-xs text-slate-400">Win Rate</p>
+                                    <p class="text-xs text-danger-400 mt-1"><i class="fas fa-arrow-down mr-1"></i>2%</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                setTimeout(() => {
+                    const convCtx = document.getElementById('conversionChart');
+                    if (convCtx) {
+                        new Chart(convCtx, {
+                            type: 'bar',
+                            data: {
+                                labels: ['Leads', 'Qualified', 'Opportunities', 'Proposals', 'Negotiations', 'Closed Won'],
+                                datasets: [{
+                                    label: 'Count',
+                                    data: [1000, 650, 420, 280, 180, 120],
+                                    backgroundColor: ['#64748b', '#3b82f6', '#6366f1', '#818cf8', '#f59e0b', '#10b981'],
+                                    borderRadius: 4
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                plugins: { legend: { display: false } },
+                                scales: {
+                                    y: { grid: { color: 'rgba(148, 163, 184, 0.1)' }, ticks: { color: '#94a3b8' } },
+                                    x: { grid: { display: false }, ticks: { color: '#94a3b8' } }
+                                }
+                            }
+                        });
+                    }
+
+                    const repCtx = document.getElementById('repChart');
+                    if (repCtx) {
+                        new Chart(repCtx, {
+                            type: 'bar',
+                            data: {
+                                labels: ['Alex', 'Jordan', 'Sam', 'Casey'],
+                                datasets: [{
+                                    label: 'Closed',
+                                    data: [425, 210, 95, 0],
+                                    backgroundColor: '#6366f1',
+                                    borderRadius: 4
+                                }, {
+                                    label: 'Pipeline',
+                                    data: [180, 320, 85, 150],
+                                    backgroundColor: '#1e293b',
+                                    borderRadius: 4
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                plugins: { legend: { labels: { color: '#94a3b8' } } },
+                                scales: {
+                                    y: { grid: { color: 'rgba(148, 163, 184, 0.1)' }, ticks: { color: '#94a3b8' } },
+                                    x: { grid: { display: false }, ticks: { color: '#94a3b8' } }
+                                }
+                            }
+                        });
+                    }
+                }, 100);
+            },
+
+            // ==================== WORKFLOWS ====================
+            renderWorkflows(container) {
+                container.innerHTML = `
+                    <div class="animate-fade-in space-y-6">
+                        <div class="flex justify-between items-center">
+                            <div class="flex gap-2">
+                                <button class="px-4 py-2 bg-primary-600 hover:bg-primary-500 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
+                                    <i class="fas fa-plus"></i> Create Workflow
+                                </button>
+                                <button class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm font-medium transition-colors">
+                                    <i class="fas fa-code-branch"></i> Templates
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="space-y-4">
+                            ${store.workflows.map(wf => `
+                                <div class="glass rounded-xl p-5 border border-slate-800 hover:border-slate-700 transition-all">
+                                    <div class="flex items-start justify-between mb-4">
+                                        <div class="flex items-center gap-3">
+                                            <div class="w-10 h-10 rounded-lg ${wf.status === 'Active' ? 'bg-success-500/20' : 'bg-slate-500/20'} flex items-center justify-center">
+                                                <i class="fas fa-cogs ${wf.status === 'Active' ? 'text-success-400' : 'text-slate-400'}"></i>
+                                            </div>
+                                            <div>
+                                                <h4 class="font-semibold text-white">${wf.name}</h4>
+                                                <p class="text-xs text-slate-500">Trigger: ${wf.trigger}</p>
+                                            </div>
+                                        </div>
+                                        <div class="flex items-center gap-3">
+                                            <span class="px-2 py-1 rounded-full text-xs font-medium ${wf.status === 'Active' ? 'bg-success-500/20 text-success-400' : 'bg-slate-500/20 text-slate-400'}">${wf.status}</span>
+                                            <button class="text-slate-400 hover:text-white"><i class="fas fa-ellipsis-v"></i></button>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center gap-2 mb-3">
+                                        ${wf.actions.map((action, i) => `
+                                            <div class="flex items-center gap-2">
+                                                <div class="px-3 py-1.5 bg-slate-800 rounded-lg text-xs text-slate-300 border border-slate-700">
+                                                    ${action}
+                                                </div>
+                                                ${i < wf.actions.length - 1 ? '<i class="fas fa-arrow-right text-slate-600 text-xs"></i>' : ''}
+                                            </div>
+                                        `).join('')}
+                                    </div>
+                                    <div class="flex items-center justify-between pt-3 border-t border-slate-800">
+                                        <span class="text-xs text-slate-500"><i class="fas fa-play-circle mr-1"></i>${wf.runs.toLocaleString()} runs</span>
+                                        <div class="flex gap-2">
+                                            <button class="text-xs text-primary-400 hover:text-primary-300">Edit</button>
+                                            <button class="text-xs text-slate-500 hover:text-slate-300">Logs</button>
+                                            <button class="text-xs text-danger-400 hover:text-danger-300">Delete</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+
+                        <div class="glass rounded-xl p-6 border border-slate-800">
+                            <h3 class="font-semibold text-white mb-4">Workflow Builder Preview</h3>
+                            <div class="flex items-center justify-center py-8">
+                                <div class="flex items-center gap-4">
+                                    <div class="w-32 p-3 bg-primary-600/20 border border-primary-500/30 rounded-lg text-center">
+                                        <i class="fas fa-bolt text-primary-400 mb-1"></i>
+                                        <p class="text-xs text-white font-medium">Trigger</p>
+                                        <p class="text-xs text-slate-500">New Lead</p>
+                                    </div>
+                                    <i class="fas fa-arrow-right text-slate-600"></i>
+                                    <div class="w-32 p-3 bg-accent-600/20 border border-accent-500/30 rounded-lg text-center">
+                                        <i class="fas fa-filter text-accent-400 mb-1"></i>
+                                        <p class="text-xs text-white font-medium">Condition</p>
+                                        <p class="text-xs text-slate-500">Score > 70</p>
+                                    </div>
+                                    <i class="fas fa-arrow-right text-slate-600"></i>
+                                    <div class="w-32 p-3 bg-success-600/20 border border-success-500/30 rounded-lg text-center">
+                                        <i class="fas fa-user-check text-success-400 mb-1"></i>
+                                        <p class="text-xs text-white font-medium">Action</p>
+                                        <p class="text-xs text-slate-500">Assign to AE</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            },
+
+            // ==================== DOCUMENTS ====================
+            renderDocuments(container) {
+                container.innerHTML = `
+                    <div class="animate-fade-in space-y-6">
+                        <div class="flex justify-between items-center">
+                            <div class="flex gap-2">
+                                <button class="px-4 py-2 bg-primary-600 hover:bg-primary-500 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
+                                    <i class="fas fa-upload"></i> Upload
+                                </button>
+                                <button class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm font-medium transition-colors">
+                                    <i class="fas fa-folder-plus"></i> New Folder
+                                </button>
+                            </div>
+                            <div class="flex gap-2">
+                                <input type="text" placeholder="Search documents..." class="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-primary-500">
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                            ${store.documents.map(doc => {
+                                const icons = { Contract: 'file-signature', Template: 'file-powerpoint', Catalog: 'file-pdf', Legal: 'file-contract' };
+                                const colors = { Contract: 'text-primary-400', Template: 'text-accent-400', Catalog: 'text-danger-400', Legal: 'text-warning-400' };
+                                return `
+                                    <div class="glass rounded-xl p-5 border border-slate-800 hover:border-slate-700 transition-all cursor-pointer group">
+                                        <div class="flex items-center justify-between mb-4">
+                                            <div class="w-12 h-12 rounded-lg bg-slate-800 flex items-center justify-center">
+                                                <i class="fas fa-${icons[doc.type]} ${colors[doc.type]} text-2xl"></i>
+                                            </div>
+                                            <button class="text-slate-500 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <i class="fas fa-ellipsis-v"></i>
+                                            </button>
+                                        </div>
+                                        <h4 class="font-medium text-white text-sm mb-1 truncate">${doc.name}</h4>
+                                        <p class="text-xs text-slate-500 mb-3">${doc.type} • ${doc.size}</p>
+                                        <div class="flex items-center justify-between text-xs text-slate-500">
+                                            <span>Modified ${doc.modified}</span>
+                                            <span>${doc.owner}</span>
+                                        </div>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+
+                        <div class="glass rounded-xl p-6 border border-slate-800">
+                            <h3 class="font-semibold text-white mb-4">Document Version History</h3>
+                            <div class="space-y-3">
+                                <div class="flex items-center gap-4 p-3 rounded-lg bg-slate-800/50">
+                                    <div class="w-8 h-8 rounded-full bg-primary-600 flex items-center justify-center text-white text-xs">v3</div>
+                                    <div class="flex-1">
+                                        <p class="text-sm text-white">Enterprise SLA - TechVentures.pdf</p>
+                                        <p class="text-xs text-slate-500">Modified by Alex Morgan on 2026-05-28</p>
+                                    </div>
+                                    <span class="text-xs text-success-400">Current</span>
+                                </div>
+                                <div class="flex items-center gap-4 p-3 rounded-lg bg-slate-800/50">
+                                    <div class="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-slate-400 text-xs">v2</div>
+                                    <div class="flex-1">
+                                        <p class="text-sm text-slate-400">Enterprise SLA - TechVentures.pdf</p>
+                                        <p class="text-xs text-slate-500">Modified by Legal Team on 2026-05-25</p>
+                                    </div>
+                                    <button class="text-xs text-primary-400 hover:text-primary-300">Restore</button>
+                                </div>
+                                <div class="flex items-center gap-4 p-3 rounded-lg bg-slate-800/50">
+                                    <div class="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-slate-400 text-xs">v1</div>
+                                    <div class="flex-1">
+                                        <p class="text-sm text-slate-400">Enterprise SLA - TechVentures.pdf</p>
+                                        <p class="text-xs text-slate-500">Created by Alex Morgan on 2026-05-20</p>
+                                    </div>
+                                    <button class="text-xs text-primary-400 hover:text-primary-300">Restore</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            },
+
+            // ==================== ADMIN ====================
+            renderAdmin(container) {
+                container.innerHTML = `
+                    <div class="animate-fade-in space-y-6">
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            <div class="glass rounded-xl p-6 border border-slate-800">
+                                <h3 class="font-semibold text-white mb-4">User Management</h3>
+                                <div class="space-y-3">
+                                    ${store.users.map(user => `
+                                        <div class="flex items-center justify-between p-3 rounded-lg bg-slate-800/50 hover:bg-slate-800 transition-colors">
+                                            <div class="flex items-center gap-3">
+                                                <img src="https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=6366f1&color=fff" class="w-9 h-9 rounded-full">
+                                                <div>
+                                                    <p class="text-sm font-medium text-white">${user.name}</p>
+                                                    <p class="text-xs text-slate-500">${user.role} • ${user.team}</p>
+                                                </div>
+                                            </div>
+                                            <div class="flex items-center gap-3">
+                                                <span class="px-2 py-1 rounded-full text-xs font-medium ${user.active ? 'bg-success-500/20 text-success-400' : 'bg-danger-500/20 text-danger-400'}">${user.active ? 'Active' : 'Inactive'}</span>
+                                                <button class="text-slate-400 hover:text-white"><i class="fas fa-edit"></i></button>
+                                            </div>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                                <button class="w-full mt-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm font-medium transition-colors">
+                                    <i class="fas fa-plus mr-2"></i> Add User
+                                </button>
+                            </div>
+
+                            <div class="glass rounded-xl p-6 border border-slate-800">
+                                <h3 class="font-semibold text-white mb-4">Role Permissions</h3>
+                                <div class="space-y-4">
+                                    ${['Sales Director', 'Account Executive', 'Sales Development', 'Sales Engineer'].map((role, i) => `
+                                        <div class="p-3 rounded-lg bg-slate-800/50">
+                                            <div class="flex items-center justify-between mb-2">
+                                                <span class="text-sm font-medium text-white">${role}</span>
+                                                <button class="text-xs text-primary-400 hover:text-primary-300">Edit</button>
+                                            </div>
+                                            <div class="grid grid-cols-3 gap-2">
+                                                ${['View', 'Create', 'Edit', 'Delete', 'Export', 'Admin'].map(perm => `
+                                                    <label class="flex items-center gap-2 text-xs text-slate-400 cursor-pointer">
+                                                        <input type="checkbox" ${i === 0 || (i < 2 && perm !== 'Admin') || (i < 3 && ['View', 'Create', 'Edit'].includes(perm)) ? 'checked' : ''} class="rounded bg-slate-700 border-slate-600 text-primary-600 focus:ring-primary-500">
+                                                        ${perm}
+                                                    </label>
+                                                `).join('')}
+                                            </div>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="glass rounded-xl p-6 border border-slate-800">
+                            <h3 class="font-semibold text-white mb-4">Audit Log</h3>
+                            <div class="overflow-x-auto">
+                                <table class="w-full">
+                                    <thead>
+                                        <tr class="border-b border-slate-800">
+                                            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Timestamp</th>
+                                            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">User</th>
+                                            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Action</th>
+                                            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Entity</th>
+                                            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase">Details</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-slate-800">
+                                        <tr>
+                                            <td class="px-4 py-3 text-xs text-slate-500">2026-05-31 14:32:15</td>
+                                            <td class="px-4 py-3 text-sm text-white">Alex Morgan</td>
+                                            <td class="px-4 py-3"><span class="px-2 py-0.5 rounded text-xs bg-success-500/20 text-success-400">UPDATE</span></td>
+                                            <td class="px-4 py-3 text-sm text-slate-400">Opportunity</td>
+                                            <td class="px-4 py-3 text-sm text-slate-400">Changed stage from "Proposal" to "Negotiation"</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="px-4 py-3 text-xs text-slate-500">2026-05-31 13:45:22</td>
+                                            <td class="px-4 py-3 text-sm text-white">Jordan Lee</td>
+                                            <td class="px-4 py-3"><span class="px-2 py-0.5 rounded text-xs bg-primary-500/20 text-primary-400">CREATE</span></td>
+                                            <td class="px-4 py-3 text-sm text-slate-400">Lead</td>
+                                            <td class="px-4 py-3 text-sm text-slate-400">Created new lead "Elena Rodriguez"</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="px-4 py-3 text-xs text-slate-500">2026-05-31 12:18:09</td>
+                                            <td class="px-4 py-3 text-sm text-white">Sam Taylor</td>
+                                            <td class="px-4 py-3"><span class="px-2 py-0.5 rounded text-xs bg-danger-500/20 text-danger-400">DELETE</span></td>
+                                            <td class="px-4 py-3 text-sm text-slate-400">Quote</td>
+                                            <td class="px-4 py-3 text-sm text-slate-400">Deleted draft quote QT-2026-0038</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="px-4 py-3 text-xs text-slate-500">2026-05-31 10:05:47</td>
+                                            <td class="px-4 py-3 text-sm text-white">Alex Morgan</td>
+                                            <td class="px-4 py-3"><span class="px-2 py-0.5 rounded text-xs bg-warning-500/20 text-warning-400">LOGIN</span></td>
+                                            <td class="px-4 py-3 text-sm text-slate-400">System</td>
+                                            <td class="px-4 py-3 text-sm text-slate-400">User login from IP 192.168.1.45</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            },
+
+            // ==================== INTEGRATIONS ====================
+            renderIntegrations(container) {
+                container.innerHTML = `
+                    <div class="animate-fade-in space-y-6">
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            ${store.integrations.map(int => `
+                                <div class="glass rounded-xl p-5 border border-slate-800 hover:border-slate-700 transition-all">
+                                    <div class="flex items-start justify-between mb-4">
+                                        <div class="w-12 h-12 rounded-lg bg-slate-800 flex items-center justify-center">
+                                            <i class="fas fa-${int.type === 'CRM' ? 'salesforce' : int.type === 'Accounting' ? 'calculator' : int.type === 'Marketing' ? 'bullhorn' : int.type === 'Communication' ? 'comments' : 'credit-card'} text-2xl ${int.status === 'Connected' ? 'text-primary-400' : int.status === 'Pending' ? 'text-warning-400' : 'text-slate-500'}"></i>
+                                        </div>
+                                        <span class="px-2 py-1 rounded-full text-xs font-medium ${int.status === 'Connected' ? 'bg-success-500/20 text-success-400' : int.status === 'Pending' ? 'bg-warning-500/20 text-warning-400' : 'bg-danger-500/20 text-danger-400'}">${int.status}</span>
+                                    </div>
+                                    <h4 class="font-semibold text-white mb-1">${int.name}</h4>
+                                    <p class="text-xs text-slate-500 mb-3">${int.type} Integration</p>
+                                    <div class="flex items-center justify-between text-xs">
+                                        <span class="text-slate-500">Last sync: ${int.lastSync}</span>
+                                        <button class="text-primary-400 hover:text-primary-300">${int.status === 'Connected' ? 'Configure' : int.status === 'Pending' ? 'Connect' : 'Reconnect'}</button>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+
+                        <div class="glass rounded-xl p-6 border border-slate-800">
+                            <h3 class="font-semibold text-white mb-4">Integration Health</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div class="p-4 rounded-lg bg-success-500/10 border border-success-500/20">
+                                    <div class="flex items-center gap-3">
+                                        <i class="fas fa-check-circle text-success-400 text-2xl"></i>
+                                        <div>
+                                            <p class="text-lg font-bold text-white">4</p>
+                                            <p class="text-xs text-slate-400">Connected</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="p-4 rounded-lg bg-warning-500/10 border border-warning-500/20">
+                                    <div class="flex items-center gap-3">
+                                        <i class="fas fa-clock text-warning-400 text-2xl"></i>
+                                        <div>
+                                            <p class="text-lg font-bold text-white">1</p>
+                                            <p class="text-xs text-slate-400">Pending</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="p-4 rounded-lg bg-danger-500/10 border border-danger-500/20">
+                                    <div class="flex items-center gap-3">
+                                        <i class="fas fa-exclamation-triangle text-danger-400 text-2xl"></i>
+                                        <div>
+                                            <p class="text-lg font-bold text-white">1</p>
+                                            <p class="text-xs text-slate-400">Disconnected</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="glass rounded-xl p-6 border border-slate-800">
+                            <h3 class="font-semibold text-white mb-4">Data Sync Log</h3>
+                            <div class="space-y-2">
+                                <div class="flex items-center justify-between p-3 rounded-lg bg-slate-800/50">
+                                    <div class="flex items-center gap-3">
+                                        <i class="fas fa-check-circle text-success-400"></i>
+                                        <span class="text-sm text-white">Salesforce sync completed</span>
+                                    </div>
+                                    <span class="text-xs text-slate-500">2 mins ago • 1,247 records</span>
+                                </div>
+                                <div class="flex items-center justify-between p-3 rounded-lg bg-slate-800/50">
+                                    <div class="flex items-center gap-3">
+                                        <i class="fas fa-check-circle text-success-400"></i>
+                                        <span class="text-sm text-white">QuickBooks sync completed</span>
+                                    </div>
+                                    <span class="text-xs text-slate-500">15 mins ago • 856 records</span>
+                                </div>
+                                <div class="flex items-center justify-between p-3 rounded-lg bg-slate-800/50">
+                                    <div class="flex items-center gap-3">
+                                        <i class="fas fa-exclamation-circle text-warning-400"></i>
+                                        <span class="text-sm text-white">Stripe connection pending authentication</span>
+                                    </div>
+                                    <span class="text-xs text-slate-500">1 hour ago</span>
+                                </div>
+                                <div class="flex items-center justify-between p-3 rounded-lg bg-slate-800/50">
+                                    <div class="flex items-center gap-3">
+                                        <i class="fas fa-times-circle text-danger-400"></i>
+                                        <span class="text-sm text-white">HubSpot sync failed - API key expired</span>
+                                    </div>
+                                    <span class="text-xs text-slate-500">3 days ago</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            },
+
+            // ==================== UTILITY FUNCTIONS ====================
+            showToast(message, type = 'info') {
+                const container = document.getElementById('toastContainer');
+                const colors = { success: 'bg-success-600', error: 'bg-danger-600', warning: 'bg-warning-600', info: 'bg-primary-600' };
+                const icons = { success: 'check-circle', error: 'times-circle', warning: 'exclamation-circle', info: 'info-circle' };
+
+                const toast = document.createElement('div');
+                toast.className = `toast-enter pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-lg ${colors[type]} text-white shadow-lg min-w-[300px]`;
+                toast.innerHTML = `
+                    <i class="fas fa-${icons[type]}"></i>
+                    <span class="text-sm font-medium">${message}</span>
+                    <button onclick="this.parentElement.remove()" class="ml-auto text-white/70 hover:text-white">
+                        <i class="fas fa-times"></i>
+                    </button>
+                `;
+
+                container.appendChild(toast);
+                setTimeout(() => {
+                    toast.style.transition = 'all 0.3s ease';
+                    toast.style.opacity = '0';
+                    toast.style.transform = 'translateX(100%)';
+                    setTimeout(() => toast.remove(), 300);
+                }, 4000);
+            },
+
+            showModal(type) {
+                const overlay = document.getElementById('modalOverlay');
+                const content = document.getElementById('modalContent');
+
+                const forms = {
+                    addLead: `
+                        <div class="p-6">
+                            <div class="flex justify-between items-center mb-6">
+                                <h3 class="text-xl font-bold text-white">Add New Lead</h3>
+                                <button onclick="app.closeModal()" class="text-slate-400 hover:text-white"><i class="fas fa-times"></i></button>
+                            </div>
+                            <div class="space-y-4">
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-sm text-slate-400 mb-1">First Name</label>
+                                        <input type="text" class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-primary-500">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm text-slate-400 mb-1">Last Name</label>
+                                        <input type="text" class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-primary-500">
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-sm text-slate-400 mb-1">Company</label>
+                                    <input type="text" class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-primary-500">
+                                </div>
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-sm text-slate-400 mb-1">Email</label>
+                                        <input type="email" class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-primary-500">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm text-slate-400 mb-1">Phone</label>
+                                        <input type="tel" class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-primary-500">
+                                    </div>
+                                </div>
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-sm text-slate-400 mb-1">Source</label>
+                                        <select class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-primary-500">
+                                            <option>Website</option>
+                                            <option>LinkedIn</option>
+                                            <option>Referral</option>
+                                            <option>Trade Show</option>
+                                            <option>Email Campaign</option>
+                                            <option>Google Ads</option>
+                                            <option>Cold Call</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm text-slate-400 mb-1">Assigned To</label>
+                                        <select class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-primary-500">
+                                            <option>Alex Morgan</option>
+                                            <option>Jordan Lee</option>
+                                            <option>Sam Taylor</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-sm text-slate-400 mb-1">Notes</label>
+                                    <textarea rows="3" class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-primary-500"></textarea>
+                                </div>
+                            </div>
+                            <div class="flex justify-end gap-3 mt-6">
+                                <button onclick="app.closeModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm font-medium transition-colors">Cancel</button>
+                                <button onclick="app.saveLead()" class="px-4 py-2 bg-primary-600 hover:bg-primary-500 text-white rounded-lg text-sm font-medium transition-colors">Save Lead</button>
+                            </div>
+                        </div>
+                    `,
+                    addContact: `
+                        <div class="p-6">
+                            <div class="flex justify-between items-center mb-6">
+                                <h3 class="text-xl font-bold text-white">Add New Contact</h3>
+                                <button onclick="app.closeModal()" class="text-slate-400 hover:text-white"><i class="fas fa-times"></i></button>
+                            </div>
+                            <div class="space-y-4">
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-sm text-slate-400 mb-1">First Name</label>
+                                        <input type="text" class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-primary-500">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm text-slate-400 mb-1">Last Name</label>
+                                        <input type="text" class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-primary-500">
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-sm text-slate-400 mb-1">Company</label>
+                                    <input type="text" class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-primary-500">
+                                </div>
+                                <div>
+                                    <label class="block text-sm text-slate-400 mb-1">Job Title</label>
+                                    <input type="text" class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-primary-500">
+                                </div>
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-sm text-slate-400 mb-1">Email</label>
+                                        <input type="email" class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-primary-500">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm text-slate-400 mb-1">Phone</label>
+                                        <input type="tel" class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-primary-500">
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-sm text-slate-400 mb-1">Contact Type</label>
+                                    <select class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-primary-500">
+                                        <option>Prospect</option>
+                                        <option>Customer</option>
+                                        <option>Partner</option>
+                                        <option>Vendor</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="flex justify-end gap-3 mt-6">
+                                <button onclick="app.closeModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm font-medium transition-colors">Cancel</button>
+                                <button onclick="app.saveContact()" class="px-4 py-2 bg-primary-600 hover:bg-primary-500 text-white rounded-lg text-sm font-medium transition-colors">Save Contact</button>
+                            </div>
+                        </div>
+                    `,
+                    addOpportunity: `
+                        <div class="p-6">
+                            <div class="flex justify-between items-center mb-6">
+                                <h3 class="text-xl font-bold text-white">Add New Opportunity</h3>
+                                <button onclick="app.closeModal()" class="text-slate-400 hover:text-white"><i class="fas fa-times"></i></button>
+                            </div>
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-sm text-slate-400 mb-1">Opportunity Name</label>
+                                    <input type="text" class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-primary-500">
+                                </div>
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-sm text-slate-400 mb-1">Company</label>
+                                        <input type="text" class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-primary-500">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm text-slate-400 mb-1">Contact</label>
+                                        <input type="text" class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-primary-500">
+                                    </div>
+                                </div>
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-sm text-slate-400 mb-1">Value ($)</label>
+                                        <input type="number" class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-primary-500">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm text-slate-400 mb-1">Stage</label>
+                                        <select class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-primary-500">
+                                            <option>Qualification</option>
+                                            <option>Discovery</option>
+                                            <option>Proposal</option>
+                                            <option>Negotiation</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-sm text-slate-400 mb-1">Expected Close Date</label>
+                                        <input type="date" class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-primary-500">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm text-slate-400 mb-1">Assigned To</label>
+                                        <select class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-primary-500">
+                                            <option>Alex Morgan</option>
+                                            <option>Jordan Lee</option>
+                                            <option>Sam Taylor</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="flex justify-end gap-3 mt-6">
+                                <button onclick="app.closeModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm font-medium transition-colors">Cancel</button>
+                                <button onclick="app.saveOpportunity()" class="px-4 py-2 bg-primary-600 hover:bg-primary-500 text-white rounded-lg text-sm font-medium transition-colors">Save Opportunity</button>
+                            </div>
+                        </div>
+                    `,
+                    addActivity: `
+                        <div class="p-6">
+                            <div class="flex justify-between items-center mb-6">
+                                <h3 class="text-xl font-bold text-white">Add New Activity</h3>
+                                <button onclick="app.closeModal()" class="text-slate-400 hover:text-white"><i class="fas fa-times"></i></button>
+                            </div>
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-sm text-slate-400 mb-1">Activity Type</label>
+                                    <div class="grid grid-cols-4 gap-2">
+                                        <button class="p-3 bg-slate-800 border border-slate-700 rounded-lg text-center hover:border-primary-500 transition-colors">
+                                            <i class="fas fa-phone text-primary-400 mb-1"></i>
+                                            <p class="text-xs text-slate-300">Call</p>
+                                        </button>
+                                        <button class="p-3 bg-slate-800 border border-slate-700 rounded-lg text-center hover:border-primary-500 transition-colors">
+                                            <i class="fas fa-video text-accent-400 mb-1"></i>
+                                            <p class="text-xs text-slate-300">Meeting</p>
+                                        </button>
+                                        <button class="p-3 bg-slate-800 border border-slate-700 rounded-lg text-center hover:border-primary-500 transition-colors">
+                                            <i class="fas fa-envelope text-warning-400 mb-1"></i>
+                                            <p class="text-xs text-slate-300">Email</p>
+                                        </button>
+                                        <button class="p-3 bg-slate-800 border border-slate-700 rounded-lg text-center hover:border-primary-500 transition-colors">
+                                            <i class="fas fa-check-square text-success-400 mb-1"></i>
+                                            <p class="text-xs text-slate-300">Task</p>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-sm text-slate-400 mb-1">Subject</label>
+                                    <input type="text" class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-primary-500">
+                                </div>
+                                <div>
+                                    <label class="block text-sm text-slate-400 mb-1">Related To</label>
+                                    <input type="text" placeholder="Contact, Account, or Opportunity" class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-primary-500">
+                                </div>
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-sm text-slate-400 mb-1">Due Date</label>
+                                        <input type="datetime-local" class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-primary-500">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm text-slate-400 mb-1">Priority</label>
+                                        <select class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-primary-500">
+                                            <option>High</option>
+                                            <option>Medium</option>
+                                            <option>Low</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-sm text-slate-400 mb-1">Notes</label>
+                                    <textarea rows="3" class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-primary-500"></textarea>
+                                </div>
+                            </div>
+                            <div class="flex justify-end gap-3 mt-6">
+                                <button onclick="app.closeModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm font-medium transition-colors">Cancel</button>
+                                <button onclick="app.saveActivity()" class="px-4 py-2 bg-primary-600 hover:bg-primary-500 text-white rounded-lg text-sm font-medium transition-colors">Save Activity</button>
+                            </div>
+                        </div>
+                    `,
+                    createQuote: `
+                        <div class="p-6">
+                            <div class="flex justify-between items-center mb-6">
+                                <h3 class="text-xl font-bold text-white">Create Quote</h3>
+                                <button onclick="app.closeModal()" class="text-slate-400 hover:text-white"><i class="fas fa-times"></i></button>
+                            </div>
+                            <div class="space-y-4">
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-sm text-slate-400 mb-1">Customer</label>
+                                        <input type="text" class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-primary-500">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm text-slate-400 mb-1">Contact</label>
+                                        <input type="text" class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-primary-500">
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-sm text-slate-400 mb-1">Expiry Date</label>
+                                    <input type="date" class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:border-primary-500">
+                                </div>
+                                <div class="border border-slate-700 rounded-lg p-4">
+                                    <h4 class="text-sm font-medium text-white mb-3">Line Items</h4>
+                                    <div class="space-y-2">
+                                        <div class="flex items-center gap-2">
+                                            <select class="flex-1 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm">
+                                                <option>FluxCRM Professional</option>
+                                                <option>FluxCRM Enterprise</option>
+                                                <option>Implementation Services</option>
+                                            </select>
+                                            <input type="number" placeholder="Qty" class="w-20 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm">
+                                            <button class="text-danger-400 hover:text-danger-300"><i class="fas fa-trash"></i></button>
+                                        </div>
+                                    </div>
+                                    <button class="mt-2 text-sm text-primary-400 hover:text-primary-300">
+                                        <i class="fas fa-plus mr-1"></i> Add Item
+                                    </button>
+                                </div>
+                                <div class="flex justify-between items-center pt-3 border-t border-slate-700">
+                                    <span class="text-sm text-slate-400">Total</span>
+                                    <span class="text-xl font-bold text-white">$0.00</span>
+                                </div>
+                            </div>
+                            <div class="flex justify-end gap-3 mt-6">
+                                <button onclick="app.closeModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm font-medium transition-colors">Cancel</button>
+                                <button onclick="app.saveQuote()" class="px-4 py-2 bg-primary-600 hover:bg-primary-500 text-white rounded-lg text-sm font-medium transition-colors">Create Quote</button>
+                            </div>
+                        </div>
+                    `
+                };
+
+                content.innerHTML = forms[type] || '<div class="p-6"><p class="text-white">Coming soon...</p></div>';
+                overlay.classList.remove('hidden');
+                overlay.classList.add('flex');
+            },
+
+            closeModal() {
+                const overlay = document.getElementById('modalOverlay');
+                overlay.classList.add('hidden');
+                overlay.classList.remove('flex');
+            },
+
+            saveLead() { this.closeModal(); this.showToast('Lead saved successfully', 'success'); },
+            saveContact() { this.closeModal(); this.showToast('Contact saved successfully', 'success'); },
+            saveOpportunity() { this.closeModal(); this.showToast('Opportunity saved successfully', 'success'); },
+            saveActivity() { this.closeModal(); this.showToast('Activity saved successfully', 'success'); },
+            saveQuote() { this.closeModal(); this.showToast('Quote created successfully', 'success'); },
+            editLead(id) { this.showToast('Edit lead feature coming soon', 'info'); },
+            deleteLead(id) { this.showToast('Lead deleted', 'warning'); },
+            toggleUserMenu() { this.showToast('User menu opened', 'info'); },
+
+            startRealtimeUpdates() {
+                setInterval(() => {
+                    const badge = document.getElementById('leadBadge');
+                    if (badge && Math.random() > 0.95) {
+                        const current = parseInt(badge.textContent);
+                        badge.textContent = current + 1;
+                        this.showToast('New lead captured from website', 'info');
+                    }
+                }, 10000);
+            }
+        };
+
+        // Initialize app
+        document.addEventListener('DOMContentLoaded', () => {
+            app.init();
+        });
+    </script>
+</body>
+</html>
